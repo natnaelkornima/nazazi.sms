@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
 import { PaymentSubmission } from '../types';
+import { validateFullName, validateEthiopianPhone } from '../lib/validation';
 import {
   CreditCard,
   Check,
@@ -26,6 +27,7 @@ import {
   Building2,
   Copy,
   Info,
+  Loader2,
 } from 'lucide-react';
 
 export const PaymentView: React.FC = () => {
@@ -33,6 +35,7 @@ export const PaymentView: React.FC = () => {
   const {
     submitPayment,
     getSubmissionByPhone,
+    checkStatusLive,
     selectedPlanForCheckout,
     setSelectedPlanForCheckout,
     submissions,
@@ -45,13 +48,15 @@ export const PaymentView: React.FC = () => {
   const [plan, setPlan] = useState<string>(
     selectedPlanForCheckout || (isAmharic ? 'የ6 ወር አገልግሎት (1000 ብር)' : '6 Months Access Plan (1000 Birr)')
   );
-  const [payerName, setPayerName] = useState(user?.name || 'Korni Mah');
+  const [payerName, setPayerName] = useState(user?.name || '');
+  const [userPhone, setUserPhone] = useState(user?.phone || '0911234567');
   const [transactionId, setTransactionId] = useState('');
   const [screenshotDataUrl, setScreenshotDataUrl] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Phone Lookup State
-  const [phoneQuery, setPhoneQuery] = useState(user?.phone || '+251 91 123 4567');
+  const [phoneQuery, setPhoneQuery] = useState(user?.phone || '0911234567');
+  const [isSearchingPhone, setIsSearchingPhone] = useState(false);
   const [lookedUpSubmission, setLookedUpSubmission] = useState<PaymentSubmission | null>(null);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
 
@@ -61,28 +66,49 @@ export const PaymentView: React.FC = () => {
     }
   }, [selectedPlanForCheckout]);
 
-  const handlePhoneLookup = (e: React.FormEvent) => {
+  const handlePhoneLookup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneQuery.trim()) {
+    const trimmed = phoneQuery.trim();
+    if (!trimmed) {
       error(isAmharic ? 'እባክዎ የስልክ ቁጥር ያስገቡ' : 'Please enter a phone number', 'Type your registered phone number to check status.');
       return;
     }
-    const found = getSubmissionByPhone(phoneQuery);
-    setLookedUpSubmission(found || null);
-    setIsStatusModalOpen(true);
+
+    const phoneVal = validateEthiopianPhone(trimmed, isAmharic);
+    if (!phoneVal.isValid) {
+      error(isAmharic ? 'ልክ ያልሆነ ስልክ ቁጥር' : 'Invalid Phone Number', phoneVal.error);
+      return;
+    }
+
+    setIsSearchingPhone(true);
+    try {
+      const found = await checkStatusLive(trimmed);
+      setLookedUpSubmission(found || null);
+      setIsStatusModalOpen(true);
+    } catch {
+      const foundLocal = getSubmissionByPhone(trimmed);
+      setLookedUpSubmission(foundLocal || null);
+      setIsStatusModalOpen(true);
+    } finally {
+      setIsSearchingPhone(false);
+    }
   };
 
   const handlePaymentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!payerName.trim()) {
-      error(isAmharic ? 'የከፋይ ስም ያስፈልጋል' : 'Payer name required', 'Please enter the name on the payment account.');
+    const nameVal = validateFullName(payerName, isAmharic);
+    if (!nameVal.isValid) {
+      error(isAmharic ? 'የከፋይ ስም ያስፈልጋል' : 'Payer name required', nameVal.error);
       return;
     }
-    if (!transactionId.trim()) {
-      error(isAmharic ? 'የግብይት መለያ ቁጥር ያስፈልጋል' : 'Transaction ID required', 'Please enter the receipt transaction ID / reference code.');
+
+    const phoneVal = validateEthiopianPhone(userPhone, isAmharic);
+    if (!phoneVal.isValid) {
+      error(isAmharic ? 'ልክ ያልሆነ ስልክ ቁጥር' : 'Invalid phone number', phoneVal.error);
       return;
     }
+
     if (!screenshotDataUrl) {
       error(isAmharic ? 'የክፍያ ደረሰኝ ፎቶ ያስፈልጋል' : 'Payment screenshot required', 'Please upload a clear screenshot of your payment receipt.');
       return;
@@ -96,13 +122,13 @@ export const PaymentView: React.FC = () => {
       const amount = isSixMonth ? 1000 : isOneMonth ? 200 : 600;
       const newSub = await submitPayment({
         userId: user?.id || 'usr_guest',
-        userName: user?.name || payerName,
+        userName: payerName.trim(),
         userEmail: user?.email || 'member@nazazi.io',
-        userPhone: user?.phone || phoneQuery || '+251 91 123 4567',
+        userPhone: phoneVal.cleanPhone,
         planName: plan,
         amount: amount,
-        payerName: payerName,
-        transactionId: transactionId,
+        payerName: payerName.trim(),
+        transactionId: transactionId.trim() || undefined,
         screenshotUrl: screenshotDataUrl,
       });
 

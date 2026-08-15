@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { uploadPaymentImageToCloudinary } from '@/lib/cloudinaryServer';
 import { saveRegistrationToSupabase } from '@/lib/supabaseServer';
+import { validateFullName, validateEthiopianPhone } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,39 +42,30 @@ export async function POST(req: NextRequest) {
     }
 
     // 1. Validate Name
-    if (!name || typeof name !== 'string' || name.trim().length < 2) {
+    const nameValidation = validateFullName(name || '');
+    if (!nameValidation.isValid) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Please enter a valid full name (at least 2 characters).',
+          error: nameValidation.error || 'Please enter a valid full name (e.g. Abebe Kebede).',
         },
         { status: 400 }
       );
     }
 
-    // 2. Validate Phone Number
-    if (!phoneNumber || typeof phoneNumber !== 'string') {
+    // 2. Validate Phone Number (Must start with 09 or +2519)
+    const phoneValidation = validateEthiopianPhone(phoneNumber || '');
+    if (!phoneValidation.isValid) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Please provide a valid phone number.',
+          error: phoneValidation.error || 'Phone number must start with 09 or +2519 (e.g. 0911234567 or +251911234567).',
         },
         { status: 400 }
       );
     }
 
-    const cleanPhone = phoneNumber.trim().replace(/[\s\-\(\)\.]/g, '');
-    const phoneDigitsOnly = cleanPhone.replace(/^\+/, '');
-
-    if (phoneDigitsOnly.length < 8 || phoneDigitsOnly.length > 15 || !/^\d+$/.test(phoneDigitsOnly)) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid phone format. Please enter a valid number (e.g. 0911234567 or +251911234567).',
-        },
-        { status: 400 }
-      );
-    }
+    const cleanPhone = phoneValidation.cleanPhone;
 
     // 3. Process & Validate Payment Image
     let buffer: Buffer;

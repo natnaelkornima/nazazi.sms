@@ -11,6 +11,7 @@ import { useToast } from '../context/ToastContext';
 import { useLanguage } from '../context/LanguageContext';
 import { PaymentSubmission } from '../types';
 import { compressImage } from '../lib/imageCompressor';
+import { validateFullName, validateEthiopianPhone } from '../lib/validation';
 import {
   User,
   Smartphone,
@@ -54,45 +55,14 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
-  // Real-time validation functions
-  const getNameValidation = (val: string) => {
-    const trimmed = val.trim();
-    if (!trimmed) {
-      return { isValid: false, message: isAmharic ? 'እባክዎ ሙሉ ስምዎን ያስገቡ' : 'Please enter your full name' };
-    }
-    if (trimmed.length < 2) {
-      return { isValid: false, message: isAmharic ? 'ስም ቢያንስ 2 ፊደላት መሆን አለበት' : 'Name must be at least 2 characters' };
-    }
-    if (/^[\d!@#$%^&*()_+=\[\]{};':"\\|,.<>\/?]+$/.test(trimmed)) {
-      return { isValid: false, message: isAmharic ? 'እባክዎ ትክክለኛ ስም ያስገቡ' : 'Please enter a valid name' };
-    }
-    return { isValid: true, message: '' };
-  };
+  // Real-time validation
+  const nameValidation = validateFullName(name, isAmharic);
+  const phoneValidation = validateEthiopianPhone(phone, isAmharic);
 
-  const getPhoneValidation = (val: string) => {
-    const cleaned = val.replace(/[\s\-\(\)\.]/g, '');
-    if (!cleaned) {
-      return { isValid: false, message: isAmharic ? 'እባክዎ የስልክ ቁጥር ያስገቡ' : 'Phone number is required' };
-    }
-    const digits = cleaned.replace(/^\+/, '');
-    if (digits.length < 8 || digits.length > 15 || !/^\d+$/.test(digits)) {
-      return {
-        isValid: false,
-        message: isAmharic
-          ? 'ልክ ያልሆነ ስልክ ቁጥር (ምሳሌ፡ 0911234567 ወይም +251911234567)'
-          : 'Invalid phone format (e.g. 0911234567 or +251911234567)',
-      };
-    }
-    return { isValid: true, message: '' };
-  };
-
-  const nameValidation = getNameValidation(name);
-  const phoneValidation = getPhoneValidation(phone);
-
-  const nameError = nameTouched && !nameValidation.isValid ? nameValidation.message : undefined;
+  const nameError = nameTouched && !nameValidation.isValid ? nameValidation.error : undefined;
   const nameSuccess = nameTouched && nameValidation.isValid ? (isAmharic ? 'ትክክለኛ ስም' : 'Looks good') : undefined;
 
-  const phoneError = phoneTouched && !phoneValidation.isValid ? phoneValidation.message : undefined;
+  const phoneError = phoneTouched && !phoneValidation.isValid ? phoneValidation.error : undefined;
   const phoneSuccess = phoneTouched && phoneValidation.isValid ? (isAmharic ? 'ትክክለኛ ስልክ ቁጥር' : 'Valid phone number') : undefined;
 
   useEffect(() => {
@@ -185,7 +155,7 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
     if (!nameValidation.isValid) {
       error(
         isAmharic ? 'እባክዎ ስምዎን በትክክል ያስገቡ' : 'Invalid Name',
-        nameValidation.message
+        nameValidation.error
       );
       return;
     }
@@ -193,7 +163,7 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
     if (!phoneValidation.isValid) {
       error(
         isAmharic ? 'እባክዎ የስልክ ቁጥር በትክክል ያስገቡ' : 'Invalid Phone Number',
-        phoneValidation.message
+        phoneValidation.error
       );
       return;
     }

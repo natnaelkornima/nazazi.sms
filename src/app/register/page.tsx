@@ -16,6 +16,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { compressImage } from '@/lib/imageCompressor';
+import { validateFullName, validateEthiopianPhone } from '@/lib/validation';
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -54,20 +55,13 @@ export default function RegisterPage() {
 
   // Validation logic
   const validateName = (val: string) => {
-    const trimmed = val.trim();
-    if (!trimmed) return 'Full name is required.';
-    if (trimmed.length < 2) return 'Name must be at least 2 characters.';
-    return null;
+    const res = validateFullName(val);
+    return res.isValid ? null : res.error;
   };
 
   const validatePhone = (val: string) => {
-    const cleaned = val.trim().replace(/[\s\-\(\)\.]/g, '');
-    if (!cleaned) return 'Phone number is required.';
-    const digits = cleaned.replace(/^\+/, '');
-    if (digits.length < 8 || digits.length > 15 || !/^\d+$/.test(digits)) {
-      return 'Please enter a valid phone number (e.g. 0911234567 or +251911234567).';
-    }
-    return null;
+    const res = validateEthiopianPhone(val);
+    return res.isValid ? null : res.error;
   };
 
   const validateFile = (file: File | null) => {

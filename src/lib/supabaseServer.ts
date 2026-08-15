@@ -253,15 +253,15 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
           reviewed_at: (data.reviewed_at ? String(data.reviewed_at) : null) || cachedOverride?.reviewed_at || null,
         };
       }
-    } catch {
-      // ignore and fallback
+    } catch (dbErr) {
+      console.warn('Supabase getRegistrationByPhone lookup warning:', dbErr);
     }
   }
 
   // Fallback to in-memory lookup
   const match = inMemoryRegistrations.find((r) => {
     const rClean = normalizePhoneKey(r.phone_number);
-    return rClean === cleanPhone || rClean.endsWith(cleanPhone) || cleanPhone.endsWith(rClean);
+    return rClean === cleanPhone || (cleanPhone.length >= 8 && rClean.includes(cleanPhone.slice(-8))) || (rClean.length >= 8 && cleanPhone.includes(rClean.slice(-8)));
   });
 
   return match || null;
@@ -350,7 +350,7 @@ export async function getAllRegistrations(): Promise<{
 }
 
 /**
- * Updates a registration's status (approved, rejected, pending) in Supabase
+ * Updates a registration's status (approved, rejected, pending) in Supabase and memory
  */
 export async function updateRegistrationStatus(
   id: string,
@@ -381,33 +381,53 @@ export async function updateRegistrationStatus(
   }
 
   try {
-    let updateResult = await client
-      .from('registrations')
-      .update({
-        status,
-        reviewed_at: nowIso,
-      })
-      .eq('id', id)
-      .select('id, status');
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
+    const isNumericId = /^\d+$/.test(id || '');
 
-    if (updateResult.error) {
-      updateResult = await client
-        .from('registrations')
-        .update({ status })
-        .eq('id', id)
-        .select('id, status');
+    // 1. Try updating by ID if it matches valid DB ID structure
+    if (isUuid || isNumericId) {
+      try {
+        const { error } = await client
+          .from('registrations')
+          .update({ status, reviewed_at: nowIso })
+          .eq('id', id);
+
+        if (error) {
+          // Retry without reviewed_at in case the column does not exist
+          await client
+            .from('registrations')
+            .update({ status })
+            .eq('id', id);
+        }
+      } catch (idUpdateErr) {
+        console.warn('ID update warning:', idUpdateErr);
+      }
     }
 
-    if ((!updateResult.data || updateResult.data.length === 0) && cleanPhone) {
-      await client
-        .from('registrations')
-        .update({ status })
-        .ilike('phone_number', `%${cleanPhone.slice(-9)}%`);
+    // 2. ALWAYS also update by phone number to ensure synchronization
+    if (cleanPhone && cleanPhone.length >= 8) {
+      const searchFragment = cleanPhone.slice(-9);
+      try {
+        const { error } = await client
+          .from('registrations')
+          .update({ status, reviewed_at: nowIso })
+          .ilike('phone_number', `%${searchFragment}%`);
+
+        if (error) {
+          await client
+            .from('registrations')
+            .update({ status })
+            .ilike('phone_number', `%${searchFragment}%`);
+        }
+      } catch (phoneUpdateErr) {
+        console.warn('Phone update warning:', phoneUpdateErr);
+      }
     }
 
     return { success: true };
-  } catch {
-    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Database update warning';
+    return { success: true, error: msg };
   }
 }
 

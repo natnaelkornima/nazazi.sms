@@ -29,11 +29,12 @@ interface PaymentContextType {
     payerName?: string;
     transactionId?: string;
   }) => Promise<PaymentSubmission>;
-  approvePayment: (id: string) => Promise<void>;
-  rejectPayment: (id: string) => Promise<void>;
+  approvePayment: (id: string, phone?: string) => Promise<void>;
+  rejectPayment: (id: string, phone?: string) => Promise<void>;
   deletePayment: (id: string, phone?: string) => Promise<void>;
   resetAllData: () => Promise<void>;
   getSubmissionByPhone: (phone: string) => PaymentSubmission | undefined;
+  checkStatusLive: (phone: string) => Promise<PaymentSubmission | null>;
 }
 
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
@@ -305,12 +306,14 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return fallbackSubmission;
   };
 
-  const approvePayment = async (id: string) => {
-    let targetPhone = '';
+  const approvePayment = async (id: string, phone?: string) => {
+    // 1. Determine target phone before asynchronous React state updates
+    const existing = submissions.find((s) => s.id === id);
+    const targetPhone = phone || existing?.userPhone || '';
+
     setSubmissions((prev) => {
       const updated = prev.map((sub) => {
-        if (sub.id === id) {
-          targetPhone = sub.userPhone;
+        if (sub.id === id || (targetPhone && normalizePhone(sub.userPhone) === normalizePhone(targetPhone))) {
           return { ...sub, status: 'approved' as const, reviewedAt: new Date().toISOString() };
         }
         return sub;
@@ -333,12 +336,14 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const rejectPayment = async (id: string) => {
-    let targetPhone = '';
+  const rejectPayment = async (id: string, phone?: string) => {
+    // 1. Determine target phone before asynchronous React state updates
+    const existing = submissions.find((s) => s.id === id);
+    const targetPhone = phone || existing?.userPhone || '';
+
     setSubmissions((prev) => {
       const updated = prev.map((sub) => {
-        if (sub.id === id) {
-          targetPhone = sub.userPhone;
+        if (sub.id === id || (targetPhone && normalizePhone(sub.userPhone) === normalizePhone(targetPhone))) {
           return { ...sub, status: 'rejected' as const, reviewedAt: new Date().toISOString() };
         }
         return sub;
@@ -362,13 +367,11 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deletePayment = async (id: string, phone?: string) => {
-    let targetPhone = phone || '';
+    const existing = submissions.find((s) => s.id === id);
+    const targetPhone = phone || existing?.userPhone || '';
+    const cleanTarget = targetPhone ? targetPhone.replace(/\D/g, '') : '';
+
     setSubmissions((prev) => {
-      const match = prev.find((s) => s.id === id);
-      if (match && !targetPhone) {
-        targetPhone = match.userPhone;
-      }
-      const cleanTarget = targetPhone ? targetPhone.replace(/\D/g, '') : '';
       const updated = prev.filter((sub) => {
         if (sub.id === id) return false;
         if (cleanTarget && sub.userPhone.replace(/\D/g, '') === cleanTarget) return false;
@@ -422,6 +425,48 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   };
 
+  /**
+   * Live lookup directly against /api/registrations?phone=...
+   * Ensures production Vercel users instantly get their real status (approved, pending, rejected)
+   */
+  const checkStatusLive = async (phone: string): Promise<PaymentSubmission | null> => {
+    const cleanDigits = normalizePhone(phone);
+    if (!cleanDigits) return null;
+
+    try {
+      const res = await fetch(`/api/registrations?phone=${encodeURIComponent(phone.trim())}`, {
+        cache: 'no-store',
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.registration) {
+          const freshSub = mapRecordToSubmission(data.registration);
+
+          // Synchronize locally so state stays updated
+          setSubmissions((prev) => {
+            const cleanTarget = normalizePhone(freshSub.userPhone);
+            const filtered = prev.filter(
+              (s) => s.id !== freshSub.id && (!cleanTarget || normalizePhone(s.userPhone) !== cleanTarget)
+            );
+            const updated = [freshSub, ...filtered];
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('nazazi_payment_submissions', JSON.stringify(updated));
+            }
+            return updated;
+          });
+
+          return freshSub;
+        }
+      }
+    } catch (err) {
+      console.warn('Live status check network notice:', err);
+    }
+
+    // Fallback to local memory / local storage
+    return getSubmissionByPhone(phone) || null;
+  };
+
   return (
     <PaymentContext.Provider
       value={{
@@ -437,6 +482,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deletePayment,
         resetAllData,
         getSubmissionByPhone,
+        checkStatusLive,
       }}
     >
       {children}

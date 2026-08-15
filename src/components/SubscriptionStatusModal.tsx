@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Modal } from './ui/Modal';
 import { Button } from './ui/Button';
@@ -8,6 +8,7 @@ import { Input } from './ui/Input';
 import { PaymentSubmission } from '../types';
 import { usePayment } from '../context/PaymentContext';
 import { useLanguage } from '../context/LanguageContext';
+import { validateEthiopianPhone } from '../lib/validation';
 import {
   Clock,
   CheckCircle2,
@@ -17,6 +18,8 @@ import {
   Search,
   ShieldCheck,
   Check,
+  Loader2,
+  Sparkles,
 } from 'lucide-react';
 
 interface SubscriptionStatusModalProps {
@@ -35,11 +38,13 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
   searchedPhone: initialPhone = '',
   onResubmit,
 }) => {
-  const { getSubmissionByPhone } = usePayment();
+  const { checkStatusLive, getSubmissionByPhone } = usePayment();
   const { language } = useLanguage();
   const isAmharic = language === 'am';
 
   const [phoneInput, setPhoneInput] = useState(initialPhone);
+  const [phoneSearchError, setPhoneSearchError] = useState<string | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [activeSubmission, setActiveSubmission] = useState<PaymentSubmission | null>(
     initialSubmission || null
   );
@@ -47,32 +52,53 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
   const [isPreviewImageOpen, setIsPreviewImageOpen] = useState(false);
   const [showSuccessView, setShowSuccessView] = useState<boolean>(Boolean(initialSubmission));
 
+  // Perform live lookup
+  const performLookup = useCallback(async (phone: string) => {
+    const trimmed = phone.trim();
+    if (!trimmed) return;
+
+    const validation = validateEthiopianPhone(trimmed, isAmharic);
+    if (!validation.isValid) {
+      setPhoneSearchError(validation.error);
+      return;
+    }
+    setPhoneSearchError(null);
+    setIsSearching(true);
+
+    try {
+      const result = await checkStatusLive(trimmed);
+      setActiveSubmission(result || null);
+    } catch {
+      setActiveSubmission(getSubmissionByPhone(trimmed) || null);
+    } finally {
+      setIsSearching(false);
+      setHasSearched(true);
+      setShowSuccessView(false);
+    }
+  }, [checkStatusLive, getSubmissionByPhone, isAmharic]);
+
   useEffect(() => {
     if (initialSubmission) {
       setActiveSubmission(initialSubmission);
       setShowSuccessView(true);
       setHasSearched(true);
       setPhoneInput(initialSubmission.userPhone);
+      setPhoneSearchError(null);
     } else if (initialPhone) {
-      const found = getSubmissionByPhone(initialPhone);
-      setActiveSubmission(found || null);
       setPhoneInput(initialPhone);
-      setShowSuccessView(false);
-      setHasSearched(true);
+      setPhoneSearchError(null);
+      performLookup(initialPhone);
     } else {
       setActiveSubmission(null);
       setShowSuccessView(false);
       setHasSearched(false);
+      setPhoneSearchError(null);
     }
-  }, [initialSubmission, initialPhone, isOpen, getSubmissionByPhone]);
+  }, [initialSubmission, initialPhone, isOpen, performLookup]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!phoneInput.trim()) return;
-    const found = getSubmissionByPhone(phoneInput);
-    setActiveSubmission(found || null);
-    setShowSuccessView(false);
-    setHasSearched(true);
+    performLookup(phoneInput);
   };
 
   const isPending = activeSubmission?.status === 'pending';
@@ -84,7 +110,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
       <Modal isOpen={isOpen} onClose={onClose} title="" description="" maxWidth="md">
         <div className="text-zinc-900 dark:text-zinc-100 max-h-[85vh] overflow-y-auto px-1 sm:px-2">
           {/* ========================================================================= */}
-          {/* 1. SLEEK, MINIMALIST PREMIUM CONFIRMATION (After User Submits)            */}
+          {/* 1. SLEEK, MINIMALIST CONFIRMATION (After User Submits)                    */}
           {/* ========================================================================= */}
           {showSuccessView && activeSubmission ? (
             <motion.div
@@ -220,27 +246,53 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
 
               {/* Phone Search Form */}
               <form onSubmit={handleSearch} className="space-y-2.5">
-                <Input
-                  placeholder={isAmharic ? 'ስልክ ቁጥር (ምሳሌ፡ 0911234567)' : 'Phone number (e.g. 0911234567)'}
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  leftIcon={<Smartphone className="w-4 h-4 text-zinc-400" />}
-                />
+                <div>
+                  <Input
+                    placeholder={isAmharic ? 'ስልክ ቁጥር (ምሳሌ፡ 0911234567 ወይም +251911234567)' : 'Phone number (e.g. 0911234567 or +251911234567)'}
+                    value={phoneInput}
+                    onChange={(e) => {
+                      setPhoneInput(e.target.value);
+                      if (phoneSearchError) setPhoneSearchError(null);
+                    }}
+                    leftIcon={<Smartphone className="w-4 h-4 text-zinc-400" />}
+                  />
+                  {phoneSearchError && (
+                    <p className="text-[11px] text-red-500 mt-1 font-medium pl-1">
+                      {phoneSearchError}
+                    </p>
+                  )}
+                </div>
                 <Button
                   type="submit"
                   size="sm"
+                  disabled={isSearching}
                   className="w-full font-bold text-xs bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-900 h-9 rounded-xl cursor-pointer"
-                  leftIcon={<Search className="w-3.5 h-3.5" />}
+                  leftIcon={isSearching ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
                 >
-                  {isAmharic ? 'ሁኔታ አረጋግጥ' : 'Check Status'}
+                  {isSearching
+                    ? isAmharic ? 'በማረጋገጥ ላይ...' : 'Checking Live Status...'
+                    : isAmharic ? 'ሁኔታ አረጋግጥ' : 'Check Status'}
                 </Button>
               </form>
 
               {/* Search Results Display */}
               <AnimatePresence mode="wait">
-                {hasSearched && (
+                {isSearching ? (
                   <motion.div
-                    key={activeSubmission ? activeSubmission.id : 'no-result'}
+                    key="searching-indicator"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="py-8 text-center space-y-2"
+                  >
+                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-zinc-400" />
+                    <p className="text-xs text-zinc-500">
+                      {isAmharic ? 'ከዳታቤዝ ጋር እየተረጋገጠ ነው...' : 'Verifying registration status...'}
+                    </p>
+                  </motion.div>
+                ) : hasSearched ? (
+                  <motion.div
+                    key={activeSubmission ? `${activeSubmission.id}-${activeSubmission.status}` : 'no-result'}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }}
@@ -274,47 +326,70 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                       </div>
                     ) : (
                       <div className="p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200/80 dark:border-zinc-800 space-y-3 text-xs">
+                        {/* Status Header */}
                         <div className="flex items-center justify-between pb-2.5 border-b border-zinc-200/70 dark:border-zinc-800">
-                          <span className="font-bold text-zinc-900 dark:text-white">
+                          <span className="font-bold text-zinc-900 dark:text-white text-sm">
                             {activeSubmission.userName}
                           </span>
                           <span
-                            className={`inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-md text-[11px] ${
+                            className={`inline-flex items-center gap-1.5 font-bold px-2.5 py-1 rounded-lg text-xs ${
                               isApproved
-                                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
                                 : isRejected
-                                  ? 'bg-red-500/10 text-red-600 dark:text-red-400'
-                                  : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                                  ? 'bg-red-500/15 text-red-700 dark:text-red-300 border border-red-500/30'
+                                  : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30'
                             }`}
                           >
-                            {isApproved && <CheckCircle2 className="w-3 h-3" />}
-                            {isRejected && <XCircle className="w-3 h-3" />}
-                            {isPending && <Clock className="w-3 h-3" />}
+                            {isApproved && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />}
+                            {isRejected && <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400 stroke-[2.5]" />}
+                            {isPending && <Clock className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 stroke-[2.5]" />}
                             {isApproved
-                              ? isAmharic ? 'ተረጋግጧል' : 'Approved'
+                              ? isAmharic ? 'ተረጋግጧል (የነቃ)' : 'Approved & Active'
                               : isRejected
-                                ? isAmharic ? 'አልተቀበለም' : 'Rejected'
-                                : isAmharic ? 'በግምገማ ላይ' : 'Pending'}
+                                ? isAmharic ? 'ውድቅ ተደርጓል' : 'Rejected'
+                                : isAmharic ? 'በግምገማ ላይ (Pending)' : 'Under Review (Pending)'}
                           </span>
                         </div>
 
-                        <div className="space-y-1.5 text-zinc-600 dark:text-zinc-400 text-[11px]">
-                          <div className="flex justify-between">
+                        {/* Approved Banner if Approved */}
+                        {isApproved && (
+                          <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/60 dark:border-emerald-800/60 flex items-center gap-2 text-emerald-800 dark:text-emerald-200 text-xs">
+                            <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <p className="leading-tight">
+                              {isAmharic
+                                ? 'እንኳን ደስ አለዎት! ምዝገባዎ በአድሚን ጸድቋል፤ የዕለቱ የSMS መልዕክቶች ወደ ስልክዎ ይላካሉ።'
+                                : 'Congratulations! Your subscription is approved and active. Daily spiritual reflections are enabled for your phone.'}
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="space-y-2 text-zinc-600 dark:text-zinc-400 text-xs pt-1">
+                          <div className="flex justify-between items-center">
                             <span>{isAmharic ? 'እቅድ' : 'Plan'}:</span>
-                            <span className="font-semibold text-zinc-900 dark:text-white">{activeSubmission.planName}</span>
+                            <span className="font-bold text-zinc-900 dark:text-white">{activeSubmission.planName}</span>
                           </div>
-                          <div className="flex justify-between">
-                            <span>{isAmharic ? 'ስልክ ቁጥር' : 'Phone'}:</span>
-                            <span className="font-mono text-zinc-900 dark:text-white">{activeSubmission.userPhone}</span>
+                          <div className="flex justify-between items-center">
+                            <span>{isAmharic ? 'ክፍያ' : 'Amount'}:</span>
+                            <span className="font-extrabold font-mono text-zinc-900 dark:text-white">{activeSubmission.amount} {isAmharic ? 'ብር' : 'ETB'}</span>
                           </div>
+                          <div className="flex justify-between items-center">
+                            <span>{isAmharic ? 'የስልክ ቁጥር' : 'Phone'}:</span>
+                            <span className="font-mono font-bold text-zinc-900 dark:text-white">{activeSubmission.userPhone}</span>
+                          </div>
+                          {activeSubmission.reviewedAt && (
+                            <div className="flex justify-between items-center text-[11px] text-zinc-400">
+                              <span>{isAmharic ? 'የተረጋገጠበት ቀን' : 'Reviewed Date'}:</span>
+                              <span>{new Date(activeSubmission.reviewedAt).toLocaleDateString()}</span>
+                            </div>
+                          )}
                         </div>
 
                         {activeSubmission.screenshotUrl && (
-                          <div className="pt-1">
+                          <div className="pt-2">
                             <button
                               type="button"
                               onClick={() => setIsPreviewImageOpen(true)}
-                              className="w-full text-center py-1.5 rounded-lg bg-zinc-200/60 dark:bg-zinc-800 text-[11px] font-semibold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 transition-colors cursor-pointer"
+                              className="w-full text-center py-2 rounded-xl bg-zinc-200/60 dark:bg-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 hover:bg-zinc-200 transition-colors cursor-pointer"
                             >
                               {isAmharic ? 'የተላከውን ደረሰኝ እይ' : 'View Uploaded Screenshot'}
                             </button>
@@ -323,7 +398,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                       </div>
                     )}
                   </motion.div>
-                )}
+                ) : null}
               </AnimatePresence>
 
               {/* Close Button */}
