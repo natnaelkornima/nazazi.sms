@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { canonicalPhone, phoneMatches } from './validation';
 
 function sanitizeSupabaseUrl(rawUrl: string): string {
   if (!rawUrl) return '';
@@ -208,32 +209,75 @@ export async function saveRegistrationToSupabase(data: {
 }
 
 /**
- * Look up a single registration by exact phone number
+ * Look up a single registration by exact or formatted phone number
  */
 export async function getRegistrationByPhone(phone: string): Promise<RegistrationRecord | null> {
-  const cleanPhone = normalizePhoneKey(phone);
-  if (!cleanPhone) return null;
+  const rawInput = (phone || '').trim();
+  if (!rawInput) return null;
+
+  const canonical = canonicalPhone(rawInput);
+  const cleanDigits = rawInput.replace(/\D/g, '');
+  const last8 = cleanDigits.slice(-8);
+
+  // 1. Check if there is an active memory override for this phone or last 8 digits
+  const overrideKey =
+    statusOverridesMap.get(rawInput) ||
+    statusOverridesMap.get(canonical) ||
+    (cleanDigits ? statusOverridesMap.get(cleanDigits) : undefined) ||
+    (last8 ? statusOverridesMap.get(last8) : undefined);
 
   const client = getSupabaseClient();
   if (client) {
     try {
-      const { data, error } = await client
-        .from('registrations')
-        .select('*')
-        .ilike('phone_number', `%${cleanPhone.slice(-9)}%`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Primary search by last 8 digits
+      let matchedData: Record<string, unknown> | null = null;
 
-      if (!error && data) {
-        const idStr = String(data.id || '');
-        const phoneStr = String(data.phone_number || '');
-        const normalized = normalizePhoneKey(phoneStr);
+      if (last8 && last8.length >= 7) {
+        const { data, error } = await client
+          .from('registrations')
+          .select('*')
+          .ilike('phone_number', `%${last8}%`)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data) {
+          matchedData = data;
+        }
+      }
+
+      // Secondary fallback: fetch top 100 recent rows and match in JS with phoneMatches
+      if (!matchedData) {
+        const { data: recentRows, error: listErr } = await client
+          .from('registrations')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(100);
+
+        if (!listErr && Array.isArray(recentRows)) {
+          const found = recentRows.find((row) =>
+            phoneMatches(String(row.phone_number || ''), rawInput)
+          );
+          if (found) {
+            matchedData = found;
+          }
+        }
+      }
+
+      if (matchedData) {
+        const idStr = String(matchedData.id || '');
+        const phoneStr = String(matchedData.phone_number || '');
+        const normalized = canonicalPhone(phoneStr);
+        const rowLast8 = phoneStr.replace(/\D/g, '').slice(-8);
+
         const cachedOverride =
           statusOverridesMap.get(idStr) ||
-          (normalized ? statusOverridesMap.get(normalized) : undefined);
+          statusOverridesMap.get(phoneStr) ||
+          statusOverridesMap.get(normalized) ||
+          (rowLast8 ? statusOverridesMap.get(rowLast8) : undefined) ||
+          overrideKey;
 
-        const dbStatus = data.status as 'pending' | 'approved' | 'rejected' | undefined;
+        const dbStatus = matchedData.status as 'pending' | 'approved' | 'rejected' | undefined;
         let finalStatus: 'pending' | 'approved' | 'rejected' = 'pending';
         if (dbStatus === 'approved' || dbStatus === 'rejected') {
           finalStatus = dbStatus;
@@ -243,14 +287,14 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
 
         return {
           id: idStr,
-          name: String(data.name || ''),
+          name: String(matchedData.name || ''),
           phone_number: phoneStr,
-          payment_image_url: String(data.payment_image_url || ''),
-          plan_name: String(data.plan_name || 'Standard Plan (200 Birr)'),
-          amount: typeof data.amount === 'number' ? data.amount : 200,
+          payment_image_url: String(matchedData.payment_image_url || ''),
+          plan_name: String(matchedData.plan_name || 'Standard Plan (200 Birr)'),
+          amount: typeof matchedData.amount === 'number' ? matchedData.amount : 200,
           status: finalStatus,
-          created_at: String(data.created_at || new Date().toISOString()),
-          reviewed_at: (data.reviewed_at ? String(data.reviewed_at) : null) || cachedOverride?.reviewed_at || null,
+          created_at: String(matchedData.created_at || new Date().toISOString()),
+          reviewed_at: (matchedData.reviewed_at ? String(matchedData.reviewed_at) : null) || cachedOverride?.reviewed_at || null,
         };
       }
     } catch (dbErr) {
@@ -258,13 +302,31 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
     }
   }
 
-  // Fallback to in-memory lookup
-  const match = inMemoryRegistrations.find((r) => {
-    const rClean = normalizePhoneKey(r.phone_number);
-    return rClean === cleanPhone || (cleanPhone.length >= 8 && rClean.includes(cleanPhone.slice(-8))) || (rClean.length >= 8 && cleanPhone.includes(rClean.slice(-8)));
-  });
+  // 2. Fallback to in-memory lookup
+  const match = inMemoryRegistrations.find((r) => phoneMatches(r.phone_number, rawInput));
 
-  return match || null;
+  if (match) {
+    const idStr = match.id;
+    const phoneStr = match.phone_number;
+    const cachedOverride =
+      statusOverridesMap.get(idStr) ||
+      statusOverridesMap.get(phoneStr) ||
+      statusOverridesMap.get(canonicalPhone(phoneStr)) ||
+      overrideKey;
+
+    let finalStatus = match.status;
+    if (cachedOverride?.status) {
+      finalStatus = cachedOverride.status;
+    }
+
+    return {
+      ...match,
+      status: finalStatus,
+      reviewed_at: cachedOverride?.reviewed_at || match.reviewed_at || null,
+    };
+  }
+
+  return null;
 }
 
 /**
@@ -358,18 +420,30 @@ export async function updateRegistrationStatus(
   phoneNumber?: string
 ): Promise<{ success: boolean; error?: string }> {
   const nowIso = new Date().toISOString();
-  const cleanPhone = phoneNumber ? normalizePhoneKey(phoneNumber) : '';
+  const rawPhone = (phoneNumber || '').trim();
+  const canonical = canonicalPhone(rawPhone);
+  const cleanDigits = rawPhone.replace(/\D/g, '');
+  const last8 = cleanDigits.slice(-8);
 
   if (id) {
     statusOverridesMap.set(id, { status, reviewed_at: nowIso });
   }
-  if (cleanPhone) {
-    statusOverridesMap.set(cleanPhone, { status, reviewed_at: nowIso });
+  if (rawPhone) {
+    statusOverridesMap.set(rawPhone, { status, reviewed_at: nowIso });
+  }
+  if (canonical) {
+    statusOverridesMap.set(canonical, { status, reviewed_at: nowIso });
+  }
+  if (cleanDigits) {
+    statusOverridesMap.set(cleanDigits, { status, reviewed_at: nowIso });
+  }
+  if (last8 && last8.length >= 7) {
+    statusOverridesMap.set(last8, { status, reviewed_at: nowIso });
   }
 
+  // Update in memory registrations immediately
   inMemoryRegistrations = inMemoryRegistrations.map((r) => {
-    const rCleanPhone = normalizePhoneKey(r.phone_number);
-    if (r.id === id || (cleanPhone && rCleanPhone === cleanPhone)) {
+    if (r.id === id || (rawPhone && phoneMatches(r.phone_number, rawPhone))) {
       return { ...r, status, reviewed_at: nowIso };
     }
     return r;
@@ -405,19 +479,18 @@ export async function updateRegistrationStatus(
     }
 
     // 2. ALWAYS also update by phone number to ensure synchronization
-    if (cleanPhone && cleanPhone.length >= 8) {
-      const searchFragment = cleanPhone.slice(-9);
+    if (last8 && last8.length >= 7) {
       try {
         const { error } = await client
           .from('registrations')
           .update({ status, reviewed_at: nowIso })
-          .ilike('phone_number', `%${searchFragment}%`);
+          .ilike('phone_number', `%${last8}%`);
 
         if (error) {
           await client
             .from('registrations')
             .update({ status })
-            .ilike('phone_number', `%${searchFragment}%`);
+            .ilike('phone_number', `%${last8}%`);
         }
       } catch (phoneUpdateErr) {
         console.warn('Phone update warning:', phoneUpdateErr);

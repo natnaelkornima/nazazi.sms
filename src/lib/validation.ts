@@ -110,3 +110,54 @@ export function validateEthiopianPhone(phone: string, isAmharic = false): PhoneV
     normalizedPhone,
   };
 }
+
+/**
+ * Converts any variation of an Ethiopian phone number to canonical 09XXXXXXXX / 07XXXXXXXX format:
+ * - 0911234567 -> 0911234567
+ * - +251911234567 -> 0911234567
+ * - 251911234567 -> 0911234567
+ * - +251 91 123 4567 -> 0911234567
+ * - 911234567 -> 0911234567
+ */
+export function canonicalPhone(phone: string): string {
+  const digits = (phone || '').replace(/\D/g, '');
+  if (!digits) return '';
+
+  if (digits.startsWith('251') && digits.length >= 11) {
+    return '0' + digits.slice(3);
+  }
+  if (digits.length === 9 && (digits.startsWith('9') || digits.startsWith('7'))) {
+    return '0' + digits;
+  }
+  if (digits.length === 10 && digits.startsWith('0')) {
+    return digits;
+  }
+  if (digits.length >= 8) {
+    // If it ends with 8 digits, default to 09 prefix if starts with 9 or 0
+    return digits.length === 8 ? '09' + digits : digits;
+  }
+  return digits;
+}
+
+/**
+ * Robustly checks if two phone representations refer to the exact same Ethiopian phone subscriber
+ */
+export function phoneMatches(phoneA?: string | null, phoneB?: string | null): boolean {
+  if (!phoneA || !phoneB) return false;
+
+  const canA = canonicalPhone(phoneA);
+  const canB = canonicalPhone(phoneB);
+  if (canA && canB && canA === canB) return true;
+
+  const digA = phoneA.replace(/\D/g, '');
+  const digB = phoneB.replace(/\D/g, '');
+  if (!digA || !digB) return false;
+  if (digA === digB) return true;
+
+  // Compare core 8-digit subscriber suffix
+  if (digA.length >= 8 && digB.length >= 8) {
+    return digA.slice(-8) === digB.slice(-8);
+  }
+
+  return false;
+}

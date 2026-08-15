@@ -20,6 +20,7 @@ import {
   Check,
   Loader2,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 
 interface SubscriptionStatusModalProps {
@@ -52,7 +53,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
   const [isPreviewImageOpen, setIsPreviewImageOpen] = useState(false);
   const [showSuccessView, setShowSuccessView] = useState<boolean>(Boolean(initialSubmission));
 
-  // Perform live lookup
+  // Perform live lookup with fallback and timeout resilience
   const performLookup = useCallback(async (phone: string) => {
     const trimmed = phone.trim();
     if (!trimmed) return;
@@ -66,8 +67,21 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
     setIsSearching(true);
 
     try {
+      // 1. Optimistic fast lookup from state
+      const localMatch = getSubmissionByPhone(trimmed);
+      if (localMatch) {
+        setActiveSubmission(localMatch);
+      }
+
+      // 2. Fetch fresh real-time status from server
       const result = await checkStatusLive(trimmed);
-      setActiveSubmission(result || null);
+      if (result) {
+        setActiveSubmission(result);
+      } else if (localMatch) {
+        setActiveSubmission(localMatch);
+      } else {
+        setActiveSubmission(null);
+      }
     } catch {
       setActiveSubmission(getSubmissionByPhone(trimmed) || null);
     } finally {
@@ -395,6 +409,19 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                             </button>
                           </div>
                         )}
+
+                        {/* Re-check Live Status Button */}
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            disabled={isSearching}
+                            onClick={() => performLookup(activeSubmission.userPhone || phoneInput)}
+                            className="w-full inline-flex items-center justify-center gap-1.5 py-2 rounded-xl bg-zinc-100 dark:bg-zinc-800/80 hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${isSearching ? 'animate-spin' : ''}`} />
+                            {isAmharic ? 'ሁኔታውን እንደገና አድስ (Refresh)' : 'Refresh Live Status'}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </motion.div>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient, getRegistrationByPhone } from '@/lib/supabaseServer';
+import { getRegistrationByPhone } from '@/lib/supabaseServer';
+import { canonicalPhone } from '@/lib/validation';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,10 +24,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const cleanPhone = rawPhone.trim().replace(/[\s\-\(\)\.]/g, '');
-    const phoneDigitsOnly = cleanPhone.replace(/^\+/, '');
+    const trimmed = rawPhone.trim();
+    const digitsOnly = trimmed.replace(/\D/g, '');
 
-    if (phoneDigitsOnly.length < 8 || phoneDigitsOnly.length > 15) {
+    if (digitsOnly.length < 8 || digitsOnly.length > 16) {
       return NextResponse.json(
         {
           success: false,
@@ -36,8 +37,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Look up exact phone registration
-    const record = await getRegistrationByPhone(cleanPhone);
+    // Look up phone registration with canonical and fuzzy suffix matching
+    const record = await getRegistrationByPhone(trimmed);
 
     if (!record) {
       return NextResponse.json(
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
         phone_number: record.phone_number,
         plan_name: record.plan_name,
         amount: record.amount,
-        status: record.status,
+        status: record.status || 'pending',
         created_at: record.created_at,
         reviewed_at: record.reviewed_at,
       },
