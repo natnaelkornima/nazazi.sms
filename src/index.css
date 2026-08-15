@@ -1,0 +1,152 @@
+@import url('https://fonts.googleapis.com/css2?family=Stack+Sans+Headline:wght@200..700&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/regular.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/regular.ttf') format('truetype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/regular.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/regular.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/regular.ttf') format('truetype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/bold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'AmharicFont';
+  src: url('/fonts/bold.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: 'Stack Sans Headline', system-ui, -apple-system, sans-serif;
+  --font-amharic: 'AmharicFont', system-ui, -apple-system, sans-serif;
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 5px;
+  --radius-lg: 5px;
+  --radius-xl: 6px;
+  --radius-2xl: 6px;
+  --radius-3xl: 6px;
+}
+
+:root {
+  font-family: 'Stack Sans Headline', system-ui, -apple-system, sans-serif;
+  color-scheme: light dark;
+}
+
+html[lang="en"],
+html[lang="en"] body {
+  font-family: 'Stack Sans Headline', system-ui, -apple-system, sans-serif;
+}
+
+html[lang="am"],
+body.lang-am,
+.lang-am {
+  --font-sans: 'AmharicFont', system-ui, -apple-system, sans-serif !important;
+}
+
+html[lang="am"],
+html[lang="am"] body,
+html[lang="am"] *,
+html[lang="am"] *::before,
+html[lang="am"] *::after,
+.lang-am,
+.lang-am body,
+.lang-am *,
+.lang-am *::before,
+.lang-am *::after,
+[lang="am"],
+[lang="am"] * {
+  font-family: 'AmharicFont', system-ui, -apple-system, sans-serif !important;
+}
+
+body {
+  font-family: 'Stack Sans Headline', system-ui, -apple-system, sans-serif;
+  background-color: #ffffff;
+  color: #09090b;
+}
+
+html.dark body {
+  background-color: #09090b;
+  color: #fafafa;
+}
+
+/* Custom Sleek Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(161, 161, 170, 0.35);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(161, 161, 170, 0.6);
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(113, 113, 122, 0.35);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(113, 113, 122, 0.6);
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Nazazi",
+  "description": "A Beacon of Hope for Times of Spiritual Weariness.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
