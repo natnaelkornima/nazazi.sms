@@ -48,6 +48,10 @@ import {
   ListFilter,
   Download,
   FileSpreadsheet,
+  Calendar,
+  Layers,
+  CircleDollarSign,
+  TrendingUp,
 } from 'lucide-react';
 
 interface SmsLogItem {
@@ -637,31 +641,34 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   return (
     <div className="space-y-6 pb-12 max-w-6xl mx-auto">
       {/* 1. Header Bar with Settings Popover */}
-      <div className="flex items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="flex items-center gap-2.5 flex-wrap">
+      <div className="flex items-center justify-between gap-3 pb-3 sm:pb-4 border-b border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           {onExitAdmin && (
             <button
               onClick={onExitAdmin}
-              className="mr-1 p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
-              title="Back to User Home Page"
+              className="p-2 sm:px-2.5 sm:py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+              title="Back to Public Site"
             >
               <ArrowLeft className="w-4 h-4" />
-              <span className="hidden sm:inline">Back to Public Site</span>
+              <span className="hidden sm:inline">Public Site</span>
             </button>
           )}
-          <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 font-black flex items-center justify-center shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 font-black flex items-center justify-center shadow-xs text-sm">
             N
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Nazazi Admin
-          </h1>
+          <div>
+            <h1 className="text-lg sm:text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50 leading-tight">
+              Nazazi Admin
+            </h1>
+            <p className="text-[10px] sm:hidden text-zinc-400 font-medium">Control Center</p>
+          </div>
         </div>
 
         {/* Settings Menu Popover */}
         <div className="relative" ref={settingsRef}>
           <button
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className={`p-2.5 rounded-2xl border transition-all flex items-center gap-2 text-xs font-bold cursor-pointer group shadow-xs ${
+            className={`p-2 sm:px-3 sm:py-2.5 rounded-xl sm:rounded-2xl border transition-all flex items-center gap-1.5 sm:gap-2 text-xs font-bold cursor-pointer group shadow-xs ${
               isSettingsOpen
                 ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900 border-zinc-900 dark:border-zinc-100'
                 : 'bg-white dark:bg-zinc-900 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800'
@@ -826,24 +833,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
       </div>
 
       {/* 2. Top Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
         <div
           onClick={() => {
             setActiveTab('approvals');
             setStatusFilter('pending');
           }}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
             activeTab === 'approvals' && statusFilter === 'pending'
               ? 'border-amber-500/80 bg-amber-500/10'
               : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700'
           }`}
         >
           <div className="flex items-center justify-between text-amber-600 dark:text-amber-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">1. Pending</span>
-            <Clock className="w-4 h-4" />
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">1. Pending</span>
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
-          <p className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1">{pendingCount}</p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Need verification</p>
+          <p className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1">{pendingCount}</p>
+          <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">Need verification</p>
         </div>
 
         <div
@@ -851,18 +858,18 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             setActiveTab('send_sms');
             setTargetType('all_approved');
           }}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
             activeTab === 'send_sms'
               ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 shadow-md'
               : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700'
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">2. Approved</span>
-            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-80">2. Approved</span>
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
           </div>
-          <p className="text-2xl font-extrabold mt-1">{approvedCount}</p>
-          <p className="text-[11px] opacity-70 mt-0.5">Ready for SMS</p>
+          <p className="text-xl sm:text-2xl font-extrabold mt-1">{approvedCount}</p>
+          <p className="text-[10px] sm:text-[11px] opacity-70 mt-0.5 truncate">Ready for SMS</p>
         </div>
 
         <div
@@ -870,107 +877,109 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             setActiveTab('approvals');
             setStatusFilter('approved');
           }}
-          className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
+          className="p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
         >
           <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">3. Revenue</span>
-            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">ETB</span>
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">3. Revenue</span>
+            <span className="text-[9px] sm:text-[10px] font-mono font-bold px-1 sm:px-1.5 py-0.5 rounded-sm bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">ETB</span>
           </div>
-          <p className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1">
+          <p className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1 truncate">
             {totalCollectedRevenue.toLocaleString()}
           </p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">
-            Total verified collections
+          <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">
+            Verified collections
           </p>
         </div>
 
         <div
           onClick={() => setActiveTab('logs')}
-          className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+          className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
             activeTab === 'logs'
               ? 'border-sky-500/80 bg-sky-500/10'
               : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700'
           }`}
         >
           <div className="flex items-center justify-between text-sky-600 dark:text-sky-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">4. Dispatches</span>
-            <History className="w-4 h-4" />
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider">4. Dispatches</span>
+            <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
-          <p className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1">{smsLogs.length}</p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Delivery history</p>
+          <p className="text-xl sm:text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1">{smsLogs.length}</p>
+          <p className="text-[10px] sm:text-[11px] text-zinc-500 mt-0.5 truncate">Delivery history</p>
         </div>
       </div>
 
-      {/* 3. Purpose Tab Navigation */}
-      <div className="flex items-center gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/60 w-fit">
-        <button
-          onClick={() => setActiveTab('approvals')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'approvals'
-              ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
-          }`}
-        >
-          <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
-          <span>1. Payment Approvals</span>
-          {pendingCount > 0 && (
-            <span className="px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-extrabold rounded-full animate-pulse">
-              {pendingCount}
+      {/* 3. Purpose Tab Navigation - Scrollable & Responsive */}
+      <div className="w-full overflow-x-auto pb-1 no-scrollbar">
+        <div className="flex items-center gap-1.5 p-1 bg-zinc-100 dark:bg-zinc-800/80 rounded-xl border border-zinc-200/80 dark:border-zinc-700/60 min-w-max">
+          <button
+            onClick={() => setActiveTab('approvals')}
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer ${
+              activeTab === 'approvals'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+            <span>1. Approvals</span>
+            {pendingCount > 0 && (
+              <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[10px] font-extrabold rounded-full animate-pulse">
+                {pendingCount}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => setActiveTab('send_sms')}
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer ${
+              activeTab === 'send_sms'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+            }`}
+          >
+            <Send className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-100" />
+            <span>2. Send SMS</span>
+            <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold rounded-md">
+              {approvedCount}
             </span>
-          )}
-        </button>
+          </button>
 
-        <button
-          onClick={() => setActiveTab('send_sms')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'send_sms'
-              ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
-          }`}
-        >
-          <Send className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-100" />
-          <span>2. Send SMS to Approved Numbers</span>
-          <span className="px-1.5 py-0.5 bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold rounded-md">
-            {approvedCount}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('logs')}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
-            activeTab === 'logs'
-              ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 shadow-xs'
-              : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
-          }`}
-        >
-          <History className="w-3.5 h-3.5 text-sky-500" />
-          <span>3. Sent SMS Logs</span>
-          <span className="px-1.5 py-0.5 bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold rounded-md">
-            {smsLogs.length}
-          </span>
-        </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-3 sm:px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 sm:gap-2 cursor-pointer ${
+              activeTab === 'logs'
+                ? 'bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-50 shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
+            }`}
+          >
+            <History className="w-3.5 h-3.5 text-sky-500" />
+            <span>3. Logs</span>
+            <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold rounded-md">
+              {smsLogs.length}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* ========================================================================= */}
       {/* PURPOSE 1: PAYMENT APPROVALS */}
       {/* ========================================================================= */}
       {activeTab === 'approvals' && (
-        <Card className="p-6 space-y-5 border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
+        <Card className="p-3.5 sm:p-6 space-y-4 sm:space-y-5 border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-3 border-b border-zinc-100 dark:border-zinc-800">
             <div>
-              <h2 className="text-base font-extrabold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+              <h2 className="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
                 Member Payment Approvals
               </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Inspect payment screenshots, verify member details, and approve active SMS access.
+              <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Verify payment receipts and activate member access.
               </p>
             </div>
 
-            {/* Filter Pills */}
-            <div className="flex items-center gap-1 text-xs font-semibold">
+            {/* Filter Pills - scrollable on mobile */}
+            <div className="flex items-center gap-1 text-xs font-semibold overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
               <button
                 onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap text-xs ${
                   statusFilter === 'all'
                     ? 'bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900'
                     : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200'
@@ -980,7 +989,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
               </button>
               <button
                 onClick={() => setStatusFilter('pending')}
-                className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap text-xs ${
                   statusFilter === 'pending'
                     ? 'bg-amber-500 text-white'
                     : 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40'
@@ -990,7 +999,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
               </button>
               <button
                 onClick={() => setStatusFilter('approved')}
-                className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap text-xs ${
                   statusFilter === 'approved'
                     ? 'bg-emerald-600 text-white'
                     : 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
@@ -1000,7 +1009,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
               </button>
               <button
                 onClick={() => setStatusFilter('rejected')}
-                className={`px-3 py-1 rounded-lg transition-colors cursor-pointer ${
+                className={`px-2.5 sm:px-3 py-1 rounded-lg transition-colors cursor-pointer whitespace-nowrap text-xs ${
                   statusFilter === 'rejected'
                     ? 'bg-red-600 text-white'
                     : 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40'
@@ -1012,42 +1021,42 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
           </div>
 
           {/* Search Input, Batch Selection & Pagination Controls Bar */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="max-w-md w-full">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+            <div className="w-full sm:max-w-xs md:max-w-sm">
               <Input
-                placeholder="Search by member name, phone number (+251...), or plan..."
+                placeholder="Search member, phone, plan..."
                 value={paymentSearch}
                 onChange={(e) => setPaymentSearch(e.target.value)}
                 leftIcon={<Search className="w-3.5 h-3.5 text-zinc-400" />}
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
-              {/* Export to CSV Button */}
-              <Button
-                size="sm"
-                variant="outline"
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap justify-end">
+              {/* Export to CSV Button with responsive icon/text */}
+              <button
+                type="button"
                 onClick={exportToCSV}
-                isLoading={isExportingCsv}
-                leftIcon={<FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
-                className="text-xs py-1.5 h-8 font-semibold shadow-2xs"
-                title="Export currently displayed list as CSV"
+                disabled={isExportingCsv}
+                aria-label="Export to CSV"
+                title="Export list as CSV"
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-all cursor-pointer shadow-2xs"
               >
-                Export to CSV
-              </Button>
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
 
-              {/* Export to PDF Button */}
-              <Button
-                size="sm"
-                variant="outline"
+              {/* Export to PDF Button with responsive icon/text */}
+              <button
+                type="button"
                 onClick={exportToPDF}
-                isLoading={isExportingPdf}
-                leftIcon={<FileText className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />}
-                className="text-xs py-1.5 h-8 font-semibold shadow-2xs"
-                title="Export currently displayed list as PDF with all details"
+                disabled={isExportingPdf}
+                aria-label="Export to PDF"
+                title="Export list as PDF"
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-all cursor-pointer shadow-2xs"
               >
-                Export to PDF
-              </Button>
+                <FileText className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                <span className="hidden sm:inline">PDF</span>
+              </button>
 
               {/* Toggle Select Mode Button */}
               {filteredSubmissions.length > 0 && (
@@ -1063,23 +1072,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                       setIsSelectionMode(true);
                     }
                   }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                     isSelectionMode || selectedIds.length > 0
                       ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-xs'
                       : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
                   }`}
+                  aria-label="Select items"
                   title="Toggle multi-item select mode"
                 >
                   <CheckSquare className="w-3.5 h-3.5" />
-                  <span>{isSelectionMode || selectedIds.length > 0 ? 'Selection Active' : 'Select'}</span>
+                  <span className="hidden md:inline">{isSelectionMode || selectedIds.length > 0 ? 'Selection Active' : 'Select'}</span>
                 </button>
               )}
 
               {/* Active Selection Floating Pill */}
               {selectedIds.length > 0 && (
-                <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 px-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs">
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200 font-mono">
-                    {selectedIds.length} chosen
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 px-2 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs">
+                  <span className="font-bold text-zinc-800 dark:text-zinc-200 font-mono text-[11px]">
+                    {selectedIds.length}
                   </span>
                   <Button
                     size="sm"
@@ -1088,7 +1098,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                     leftIcon={<Trash2 className="w-3 h-3" />}
                     className="text-xs py-0.5 h-6.5 px-2"
                   >
-                    Delete Selected
+                    <span className="hidden sm:inline">Delete Selected</span>
+                    <span className="sm:hidden">Delete</span>
                   </Button>
                   <button
                     type="button"
@@ -1096,7 +1107,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                       setSelectedIds([]);
                       setIsSelectionMode(false);
                     }}
-                    className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 text-[11px] underline cursor-pointer"
+                    className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 text-[11px] underline cursor-pointer px-0.5"
                   >
                     Clear
                   </button>
@@ -1105,7 +1116,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             </div>
           </div>
 
-          {/* Registrations Table */}
+          {/* Registrations List - Mobile Cards View + Desktop Table View */}
           {filteredSubmissions.length === 0 ? (
             <div className="py-14 text-center text-xs text-zinc-400 space-y-3 bg-zinc-50/50 dark:bg-zinc-900/40 rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-800">
               <AlertCircle className="w-9 h-9 mx-auto text-zinc-300 dark:text-zinc-700" />
@@ -1126,7 +1137,209 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             </div>
           ) : (
             <div className="space-y-3">
-              <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+              {/* Mobile View: Modern Cards Layout (Visible only on < md screens) */}
+              <div className="grid grid-cols-1 gap-2.5 md:hidden">
+                {paginatedSubmissions.map((sub, pageIndex) => {
+                  const absoluteIndex = startIndex + pageIndex + 1;
+                  const isSelected = selectedIds.includes(sub.id);
+
+                  return (
+                    <div
+                      key={`m-${sub.id}`}
+                      onClick={() => {
+                        if (isSelectionMode) handleToggleSelect(sub.id);
+                      }}
+                      className={`p-3 rounded-xl border transition-all space-y-2.5 ${
+                        isSelected
+                          ? 'bg-zinc-100/90 dark:bg-zinc-800 border-zinc-900 dark:border-zinc-100 shadow-2xs'
+                          : 'bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800'
+                      }`}
+                    >
+                      {/* Card Header: Index/Select, Name, Status */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          {(isSelectionMode || selectedIds.length > 0) && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleSelect(sub.id);
+                              }}
+                              className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer border ${
+                                isSelected
+                                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-2xs'
+                                  : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800'
+                              }`}
+                              aria-label={isSelected ? 'Deselect member' : 'Select member'}
+                            >
+                              {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                            </button>
+                          )}
+                          <span className="text-[11px] font-mono font-bold text-zinc-400 dark:text-zinc-500">
+                            #{absoluteIndex}
+                          </span>
+                          <div>
+                            <h3 className="font-bold text-zinc-900 dark:text-zinc-100 text-sm leading-tight">
+                              {sub.userName}
+                            </h3>
+                            <p className="text-[11px] font-mono text-zinc-600 dark:text-zinc-300 font-semibold flex items-center gap-1">
+                              <Smartphone className="w-3 h-3 text-zinc-400" /> {sub.userPhone}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div>
+                          {sub.status === 'pending' && <Badge variant="amber" dot>Pending</Badge>}
+                          {sub.status === 'approved' && <Badge variant="zinc" dot>Approved</Badge>}
+                          {sub.status === 'rejected' && <Badge variant="danger">Rejected</Badge>}
+                        </div>
+                      </div>
+
+                      {/* Card Body: Plan Selector, Receipt thumbnail, Date */}
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 text-xs">
+                        {/* Plan & Amount Select */}
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative inline-flex items-center">
+                            <select
+                              value={sub.amount >= 1000 ? '1000' : sub.amount >= 600 ? '600' : '200'}
+                              onChange={async (e) => {
+                                const val = Number(e.target.value);
+                                const newPlanName =
+                                  val === 1000
+                                    ? '6 Months Access (1,000 Birr)'
+                                    : val === 600
+                                    ? '3 Months Access (600 Birr)'
+                                    : '1 Month Access (200 Birr)';
+                                await updatePaymentPlan(sub.id, newPlanName, val, sub.userPhone);
+                                success('Plan Updated', `Set to ${val} ETB for ${sub.userName}`);
+                              }}
+                              className={`text-[10px] font-extrabold uppercase py-1 pl-2 pr-5 rounded-md border appearance-none cursor-pointer ${
+                                sub.amount >= 1000 || sub.planName.toLowerCase().includes('6')
+                                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                                  : sub.amount >= 600 || sub.planName.toLowerCase().includes('3')
+                                  ? 'bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                                  : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700'
+                              }`}
+                              title="Change plan tier"
+                            >
+                              <option value="200" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                1 Mo • 200 ETB
+                              </option>
+                              <option value="600" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                3 Mo • 600 ETB
+                              </option>
+                              <option value="1000" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                6 Mo • 1k ETB
+                              </option>
+                            </select>
+                            <ChevronDown className="w-2.5 h-2.5 absolute right-1 pointer-events-none opacity-60" />
+                          </div>
+                        </div>
+
+                        {/* Receipt preview button */}
+                        <div className="flex items-center gap-2">
+                          {sub.screenshotUrl ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPreviewSubmission(sub);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700"
+                              title="View receipt screenshot"
+                            >
+                              <Eye className="w-3 h-3 text-zinc-500" /> Receipt
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-zinc-400 italic">No receipt</span>
+                          )}
+
+                          <span className="text-[10px] font-mono text-zinc-400">
+                            {new Date(sub.submittedAt).toLocaleDateString([], { month: 'numeric', day: 'numeric' })}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Card Footer: Action Buttons (Large, touch-friendly icon/label buttons) */}
+                      <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                        {sub.status === 'pending' && (
+                          <div className="flex items-center gap-1.5 w-full">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                approvePayment(sub.id);
+                                success('Approved!', `Activated for ${sub.userPhone}`);
+                              }}
+                              className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all cursor-pointer shadow-2xs"
+                              title="Approve registration"
+                            >
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                rejectPayment(sub.id);
+                                info('Rejected', `Marked ${sub.userPhone} as rejected`);
+                              }}
+                              className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 transition-all cursor-pointer border border-rose-200 dark:border-rose-900"
+                              title="Reject registration"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+
+                        {sub.status === 'approved' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPhone(sub.userPhone);
+                              setActiveTab('send_sms');
+                              setTargetType('single_member');
+                            }}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
+                          >
+                            <Send className="w-3 h-3" /> Send SMS
+                          </button>
+                        )}
+
+                        {sub.status === 'rejected' && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              approvePayment(sub.id);
+                              success('Approved', `Status updated to active for ${sub.userPhone}`);
+                            }}
+                            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
+                          >
+                            <Check className="w-3 h-3" /> Re-Approve
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setItemToDelete(sub);
+                          }}
+                          className="p-1.5 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer"
+                          title="Delete this record"
+                          aria-label="Delete registration"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop View: Full-featured Table (Visible only on >= md screens) */}
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
                 <table className="w-full text-left text-xs">
                   <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-500 font-semibold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                     <tr>
@@ -1171,7 +1384,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                         <tr
                           key={sub.id}
                           onClick={(e) => {
-                            // If in selection mode and not clicking an interactive control, toggle row selection
                             const target = e.target as HTMLElement;
                             if (
                               isSelectionMode &&
@@ -1382,17 +1594,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
               </div>
 
               {/* 20 Per Page Pagination Bar */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 px-1 text-xs text-zinc-500">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 sm:gap-3 pt-2 px-1 text-xs text-zinc-500">
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                  <span className="font-mono text-[11px] sm:text-xs">
                     Showing <strong className="text-zinc-900 dark:text-zinc-100">{startIndex + 1}</strong>–
                     <strong className="text-zinc-900 dark:text-zinc-100">{endIndex}</strong> of{' '}
-                    <strong className="text-zinc-900 dark:text-zinc-100">{filteredSubmissions.length}</strong> members
+                    <strong className="text-zinc-900 dark:text-zinc-100">{filteredSubmissions.length}</strong>
                   </span>
 
                   {/* Page Size Selector */}
-                  <div className="flex items-center gap-1.5 text-[11px]">
-                    <span>per page:</span>
+                  <div className="flex items-center gap-1 text-[11px]">
+                    <span className="text-zinc-400">per page:</span>
                     <select
                       value={pageSize}
                       onChange={(e) => setPageSize(Number(e.target.value))}
@@ -1406,18 +1618,20 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                   </div>
                 </div>
 
-                {/* Page Navigation Buttons (Previous, Next, and Page Indicator) */}
-                <div className="flex items-center gap-1.5">
+                {/* Page Navigation Buttons */}
+                <div className="flex items-center gap-1 sm:gap-1.5">
                   <button
                     type="button"
                     disabled={validCurrentPage <= 1}
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                    className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs text-xs"
+                    aria-label="Previous page"
                   >
-                    <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Previous</span>
                   </button>
 
-                  <span className="px-3 py-1.5 font-mono font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                  <span className="px-2.5 sm:px-3 py-1.5 font-mono font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700 text-[11px] sm:text-xs">
                     {validCurrentPage} / {totalPages}
                   </span>
 
@@ -1425,9 +1639,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                     type="button"
                     disabled={validCurrentPage >= totalPages}
                     onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                    className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs text-xs"
+                    aria-label="Next page"
                   >
-                    Next <ChevronRight className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -1608,29 +1824,31 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
       {/* PURPOSE 3: SMS DELIVERY LOGS */}
       {/* ========================================================================= */}
       {activeTab === 'logs' && (
-        <Card className="p-6 space-y-4 border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-100 dark:border-zinc-800">
+        <Card className="p-3.5 sm:p-6 space-y-4 border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex items-center justify-between gap-2 pb-3 border-b border-zinc-100 dark:border-zinc-800">
             <div>
-              <h2 className="text-base font-extrabold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
-                Recent SMS Dispatch History
+              <h2 className="text-sm sm:text-base font-extrabold text-zinc-900 dark:text-zinc-50 flex items-center gap-2">
+                SMS Dispatch History
               </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                Audit log of all sent encouragement and spiritual messages.
+              <p className="text-[11px] sm:text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Audit log of sent encouragement and spiritual messages.
               </p>
             </div>
             {smsLogs.length > 0 && (
-              <Button
-                size="sm"
-                variant="secondary"
+              <button
+                type="button"
                 onClick={() => {
                   setSmsLogs([]);
                   if (typeof window !== 'undefined') localStorage.removeItem('nazazi_sms_logs');
                   info('Cleared SMS logs');
                 }}
-                leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-300 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
+                title="Clear all logs"
+                aria-label="Clear all logs"
               >
-                Clear History
-              </Button>
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Clear History</span>
+              </button>
             )}
           </div>
 
@@ -1641,50 +1859,82 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
               <p>Dispatched messages from the SMS Console will appear here with delivery timestamps.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-500 font-semibold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
-                  <tr>
-                    <th className="p-3.5 pl-4">Recipient</th>
-                    <th className="p-3.5">Dispatched Message</th>
-                    <th className="p-3.5">Time</th>
-                    <th className="p-3.5">Segments</th>
-                    <th className="p-3.5 pr-4 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
-                  {smsLogs.map((log) => (
-                    <tr key={log.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40">
-                      <td className="p-3.5 pl-4">
-                        <p className="font-bold text-zinc-900 dark:text-zinc-100">{log.recipientName}</p>
-                        <p className="text-[11px] font-mono text-zinc-700 dark:text-zinc-300 font-semibold">
-                          {log.recipientPhone}
-                        </p>
-                      </td>
+            <div className="space-y-2.5">
+              {/* Mobile Logs Cards (< md) */}
+              <div className="grid grid-cols-1 gap-2.5 md:hidden">
+                {smsLogs.map((log) => (
+                  <div
+                    key={`m-log-${log.id}`}
+                    className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/80 space-y-2 text-xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-bold text-zinc-900 dark:text-zinc-100 text-sm leading-tight">{log.recipientName}</p>
+                        <p className="text-[11px] font-mono text-zinc-600 dark:text-zinc-300 font-semibold">{log.recipientPhone}</p>
+                      </div>
+                      <Badge variant="zinc" dot>
+                        {log.status}
+                      </Badge>
+                    </div>
 
-                      <td className="p-3.5 max-w-xs sm:max-w-md">
-                        <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed truncate" title={log.messageText}>
-                          {log.messageText}
-                        </p>
-                      </td>
+                    <p className="text-xs text-zinc-700 dark:text-zinc-300 bg-zinc-50 dark:bg-zinc-800/60 p-2.5 rounded-lg border border-zinc-100 dark:border-zinc-800 leading-relaxed font-sans">
+                      {log.messageText}
+                    </p>
 
-                      <td className="p-3.5 text-zinc-500">
-                        {new Date(log.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </td>
+                    <div className="flex items-center justify-between text-[11px] text-zinc-500 font-mono pt-1">
+                      <span>{new Date(log.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(log.sentAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                      <span>{log.segmentCount} segment(s)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
 
-                      <td className="p-3.5 font-mono text-zinc-500">
-                        {log.segmentCount}
-                      </td>
-
-                      <td className="p-3.5 pr-4 text-right">
-                        <Badge variant="zinc" dot>
-                          {log.status}
-                        </Badge>
-                      </td>
+              {/* Desktop Logs Table (>= md) */}
+              <div className="hidden md:block overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-500 font-semibold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      <th className="p-3.5 pl-4">Recipient</th>
+                      <th className="p-3.5">Dispatched Message</th>
+                      <th className="p-3.5">Time</th>
+                      <th className="p-3.5">Segments</th>
+                      <th className="p-3.5 pr-4 text-right">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+                    {smsLogs.map((log) => (
+                      <tr key={log.id} className="hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40">
+                        <td className="p-3.5 pl-4">
+                          <p className="font-bold text-zinc-900 dark:text-zinc-100">{log.recipientName}</p>
+                          <p className="text-[11px] font-mono text-zinc-700 dark:text-zinc-300 font-semibold">
+                            {log.recipientPhone}
+                          </p>
+                        </td>
+
+                        <td className="p-3.5 max-w-xs sm:max-w-md">
+                          <p className="text-xs text-zinc-700 dark:text-zinc-300 leading-relaxed truncate" title={log.messageText}>
+                            {log.messageText}
+                          </p>
+                        </td>
+
+                        <td className="p-3.5 text-zinc-500">
+                          {new Date(log.sentAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+
+                        <td className="p-3.5 font-mono text-zinc-500">
+                          {log.segmentCount}
+                        </td>
+
+                        <td className="p-3.5 pr-4 text-right">
+                          <Badge variant="zinc" dot>
+                            {log.status}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </Card>
