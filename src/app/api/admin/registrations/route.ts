@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   getAllRegistrations,
   updateRegistrationStatus,
+  updateRegistrationPlan,
   deleteRegistration,
   resetAllRegistrations,
   isSupabaseConfigured,
@@ -66,27 +67,44 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { id, status, phone, phoneNumber, userPhone } = body;
+    const { id, status, planName, amount, phone, phoneNumber, userPhone } = body;
     const phoneToMatch = phone || phoneNumber || userPhone;
 
-    if (!id || !status || !['pending', 'approved', 'rejected'].includes(status)) {
+    if (!id && !phoneToMatch) {
       return NextResponse.json(
-        { success: false, error: 'Invalid parameters. Valid status is pending, approved, or rejected.' },
+        { success: false, error: 'Registration ID or phone number is required.' },
         { status: 400 }
       );
     }
 
-    const result = await updateRegistrationStatus(id, status, phoneToMatch);
-    if (!result.success) {
-      console.warn('Supabase status update notice:', result.error);
+    // Handle Plan / Amount update
+    if (planName || typeof amount === 'number') {
+      const targetAmount = typeof amount === 'number' ? amount : 200;
+      const targetPlan = planName || (targetAmount === 1000 ? '6 Months Access (1,000 Birr)' : targetAmount === 600 ? '3 Months Access (600 Birr)' : '1 Month Access (200 Birr)');
+      await updateRegistrationPlan(id || '', targetPlan, targetAmount, phoneToMatch);
+    }
+
+    // Handle Status update
+    if (status) {
+      if (!['pending', 'approved', 'rejected'].includes(status)) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid status. Valid values: pending, approved, rejected.' },
+          { status: 400 }
+        );
+      }
+      const result = await updateRegistrationStatus(id, status, phoneToMatch);
+      if (!result.success) {
+        console.warn('Supabase status update notice:', result.error);
+      }
     }
 
     return NextResponse.json({
       success: true,
-      message: `Registration status updated to ${status}.`,
+      message: 'Registration updated successfully.',
       id,
       status,
-      error: result.error || null,
+      planName,
+      amount,
     });
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Error updating registration';

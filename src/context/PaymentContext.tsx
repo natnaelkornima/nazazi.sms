@@ -33,6 +33,7 @@ interface PaymentContextType {
   }) => Promise<PaymentSubmission>;
   approvePayment: (id: string, phone?: string) => Promise<void>;
   rejectPayment: (id: string, phone?: string) => Promise<void>;
+  updatePaymentPlan: (id: string, planName: string, amount: number, phone?: string) => Promise<void>;
   deletePayment: (id: string, phone?: string) => Promise<void>;
   resetAllData: () => Promise<void>;
   getSubmissionByPhone: (phone: string) => PaymentSubmission | undefined;
@@ -383,6 +384,35 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const updatePaymentPlan = async (id: string, planName: string, amount: number, phone?: string) => {
+    const existing = submissions.find((s) => s.id === id);
+    const targetPhone = phone || existing?.userPhone || '';
+
+    setSubmissions((prev) => {
+      const updated = prev.map((sub) => {
+        if (sub.id === id || (targetPhone && phoneMatches(sub.userPhone, targetPhone))) {
+          return { ...sub, planName, amount };
+        }
+        return sub;
+      });
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('nazazi_payment_submissions', JSON.stringify(updated));
+      }
+      return updated;
+    });
+
+    try {
+      const headers = getAdminAuthHeaders();
+      await fetch('/api/admin/registrations', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ id, phone: targetPhone, planName, amount }),
+      });
+    } catch (err) {
+      console.warn('Plan update notice:', err);
+    }
+  };
+
   const deletePayment = async (id: string, phone?: string) => {
     const existing = submissions.find((s) => s.id === id);
     const targetPhone = phone || existing?.userPhone || '';
@@ -489,6 +519,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         submitPayment,
         approvePayment,
         rejectPayment,
+        updatePaymentPlan,
         deletePayment,
         resetAllData,
         getSubmissionByPhone,

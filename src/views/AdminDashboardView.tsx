@@ -41,6 +41,7 @@ import {
   Lock,
   Settings,
   ChevronRight,
+  ChevronDown,
   X,
 } from 'lucide-react';
 
@@ -95,6 +96,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
     fetchRegistrations,
     approvePayment,
     rejectPayment,
+    updatePaymentPlan,
     deletePayment,
     resetAllData,
   } = usePayment();
@@ -835,18 +837,42 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                       </td>
 
                       <td className="p-3.5">
-                        <div className="space-y-1">
-                          <span
-                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${
-                              sub.amount >= 1000 || sub.planName.toLowerCase().includes('6')
-                                ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
-                                : sub.amount >= 600 || sub.planName.toLowerCase().includes('3')
-                                ? 'bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-300 dark:border-purple-800'
-                                : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700'
-                            }`}
-                          >
-                            {sub.planName}
-                          </span>
+                        <div className="space-y-1.5">
+                          <div className="relative inline-flex items-center">
+                            <select
+                              value={sub.amount >= 1000 ? '1000' : sub.amount >= 600 ? '600' : '200'}
+                              onChange={async (e) => {
+                                const val = Number(e.target.value);
+                                const newPlanName =
+                                  val === 1000
+                                    ? '6 Months Access (1,000 Birr)'
+                                    : val === 600
+                                    ? '3 Months Access (600 Birr)'
+                                    : '1 Month Access (200 Birr)';
+                                await updatePaymentPlan(sub.id, newPlanName, val, sub.userPhone);
+                                success('Plan Updated', `Set to ${val} ETB (${val === 1000 ? '6 Months' : val === 600 ? '3 Months' : '1 Month'}) for ${sub.userName}`);
+                              }}
+                              className={`text-[10px] font-extrabold uppercase py-1 pl-2 pr-6 rounded-md border appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors ${
+                                sub.amount >= 1000 || sub.planName.toLowerCase().includes('6')
+                                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                                  : sub.amount >= 600 || sub.planName.toLowerCase().includes('3')
+                                  ? 'bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                                  : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700'
+                              }`}
+                              title="Click to adjust plan tier & amount"
+                            >
+                              <option value="200" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                1 Mo • 200 ETB
+                              </option>
+                              <option value="600" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                3 Mo • 600 ETB
+                              </option>
+                              <option value="1000" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                6 Mo • 1,000 ETB
+                              </option>
+                            </select>
+                            <ChevronDown className="w-3 h-3 absolute right-1.5 pointer-events-none opacity-60" />
+                          </div>
                           <p className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100">
                             {Number(sub.amount).toLocaleString()} ETB
                           </p>
@@ -1251,6 +1277,48 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                   {previewSubmission.status === 'pending' && <Badge variant="amber" dot>Pending Approval</Badge>}
                   {previewSubmission.status === 'approved' && <Badge variant="zinc" dot>Approved & Active</Badge>}
                   {previewSubmission.status === 'rejected' && <Badge variant="danger">Rejected</Badge>}
+                </div>
+              </div>
+
+              {/* Quick Plan & Amount Adjuster */}
+              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/80">
+                <span className="text-zinc-500 dark:text-zinc-400 block text-[10px] uppercase font-bold tracking-wider mb-1.5">
+                  Verify / Adjust Plan Tier
+                </span>
+                <div className="flex items-center gap-2">
+                  {[
+                    { amount: 200, name: '1 Month Access (200 Birr)', label: '1 Month (200 ETB)' },
+                    { amount: 600, name: '3 Months Access (600 Birr)', label: '3 Months (600 ETB)' },
+                    { amount: 1000, name: '6 Months Access (1,000 Birr)', label: '6 Months (1,000 ETB)' },
+                  ].map((tier) => {
+                    const isSelected =
+                      (tier.amount === 1000 && (previewSubmission.amount >= 1000 || previewSubmission.planName.toLowerCase().includes('6'))) ||
+                      (tier.amount === 600 && previewSubmission.amount === 600 && !previewSubmission.planName.toLowerCase().includes('6')) ||
+                      (tier.amount === 200 && previewSubmission.amount <= 200 && !previewSubmission.planName.toLowerCase().includes('6') && !previewSubmission.planName.toLowerCase().includes('3'));
+
+                    return (
+                      <button
+                        key={tier.amount}
+                        type="button"
+                        onClick={async () => {
+                          await updatePaymentPlan(previewSubmission.id, tier.name, tier.amount, previewSubmission.userPhone);
+                          setPreviewSubmission({
+                            ...previewSubmission,
+                            planName: tier.name,
+                            amount: tier.amount,
+                          });
+                          success('Plan Adjusted', `Set to ${tier.label} for ${previewSubmission.userName}`);
+                        }}
+                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all cursor-pointer text-center ${
+                          isSelected
+                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-xs'
+                            : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400'
+                        }`}
+                      >
+                        {tier.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>

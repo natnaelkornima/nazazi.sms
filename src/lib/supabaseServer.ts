@@ -758,6 +758,63 @@ export async function getAllRegistrations(): Promise<{
 }
 
 /**
+ * Updates a registration's plan and amount in Supabase and in-memory cache
+ */
+export async function updateRegistrationPlan(
+  id: string,
+  planName: string,
+  amount: number,
+  phoneNumber?: string
+): Promise<{ success: boolean; error?: string }> {
+  const rawPhone = (phoneNumber || '').trim();
+  recordPlanMeta(id, rawPhone, planName, amount);
+
+  inMemoryRegistrations = inMemoryRegistrations.map((r) => {
+    if (r.id === id || (rawPhone && phoneMatches(r.phone_number, rawPhone))) {
+      return { ...r, plan_name: planName, amount };
+    }
+    return r;
+  });
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true };
+  }
+
+  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+  const cleanDigits = rawPhone.replace(/\D/g, '');
+  const last8 = cleanDigits.slice(-8);
+
+  for (const tableName of candidateTables) {
+    try {
+      const payloads = [
+        { plan_name: planName, amount: amount },
+        { plan: planName, amount: amount },
+        { plan_name: planName, price: amount },
+        { plan_name: planName },
+        { amount: amount },
+      ];
+
+      for (const p of payloads) {
+        if (id && !id.startsWith('reg_')) {
+          const { error } = await client.from(tableName).update(p).eq('id', id);
+          if (!error) break;
+        } else if (last8 && last8.length >= 7) {
+          for (const phoneCol of ['phone_number', 'phone', 'user_phone', 'mobile']) {
+            const { error } = await client.from(tableName).update(p).ilike(phoneCol, `%${last8}%`);
+            if (!error) break;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`Plan update notice for ${tableName}:`, err);
+    }
+  }
+
+  return { success: true };
+}
+
+/**
  * Updates a registration's approval status in Supabase and in-memory cache
  */
 export async function updateRegistrationStatus(
