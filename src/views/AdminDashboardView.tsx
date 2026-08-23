@@ -52,6 +52,8 @@ import {
   Layers,
   CircleDollarSign,
   TrendingUp,
+  User,
+  CreditCard,
 } from 'lucide-react';
 
 interface SmsLogItem {
@@ -1940,128 +1942,69 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
         </Card>
       )}
 
-      {/* Screenshot Inspection Modal */}
+      {/* Receipt Inspection Modal - Compact, Modern & Zero Wasted Whitespace */}
       <Modal
         isOpen={!!previewSubmission}
         onClose={() => setPreviewSubmission(null)}
-        title="Payment Receipt Screenshot"
-        description={previewSubmission ? `${previewSubmission.userName} • ${previewSubmission.userPhone}` : ''}
+        maxWidth="md"
+        noPadding
       >
         {previewSubmission && (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 space-y-2 text-xs border border-zinc-200 dark:border-zinc-700">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <span className="text-zinc-400 block text-[10px] uppercase font-bold tracking-wider">Member Name</span>
-                  <span className="font-bold text-zinc-900 dark:text-zinc-100 text-sm">
-                    {previewSubmission.userName}
-                  </span>
+          <div className="flex flex-col">
+            {/* Header: Name, Plan & Close Button */}
+            <div className="px-4 py-3 flex items-center justify-between gap-2 border-b border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-800/40">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="min-w-0">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">
+                    Name: <strong className="text-zinc-900 dark:text-zinc-100 font-bold text-sm">{previewSubmission.userName}</strong>
+                  </p>
                 </div>
-                <div>
-                  <span className="text-zinc-400 block text-[10px] uppercase font-bold tracking-wider">Phone Number</span>
-                  <span className="font-mono font-bold text-zinc-900 dark:text-zinc-100 text-sm">
-                    {previewSubmission.userPhone}
+                <div className="shrink-0 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span>Plan:</span>
+                  <span className="px-2 py-0.5 rounded-md bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 font-bold font-mono text-xs">
+                    {previewSubmission.amount || (previewSubmission.planName.toLowerCase().includes('1000') || previewSubmission.planName.toLowerCase().includes('1,000') ? 1000 : previewSubmission.planName.toLowerCase().includes('600') ? 600 : 200)} Birr
                   </span>
-                </div>
-                <div>
-                  <span className="text-zinc-400 block text-[10px] uppercase font-bold tracking-wider">Selected Plan</span>
-                  <span className="font-bold text-zinc-800 dark:text-zinc-200">
-                    {previewSubmission.planName} ({previewSubmission.amount} ETB)
-                  </span>
-                </div>
-                <div>
-                  <span className="text-zinc-400 block text-[10px] uppercase font-bold tracking-wider">Status</span>
-                  {previewSubmission.status === 'pending' && <Badge variant="amber" dot>Pending Approval</Badge>}
-                  {previewSubmission.status === 'approved' && <Badge variant="zinc" dot>Approved & Active</Badge>}
-                  {previewSubmission.status === 'rejected' && <Badge variant="danger">Rejected</Badge>}
                 </div>
               </div>
 
-              {/* Quick Plan & Amount Adjuster */}
-              <div className="pt-2 border-t border-zinc-200 dark:border-zinc-700/80">
-                <span className="text-zinc-500 dark:text-zinc-400 block text-[10px] uppercase font-bold tracking-wider mb-1.5">
-                  Verify / Adjust Plan Tier
-                </span>
-                <div className="flex items-center gap-2">
-                  {[
-                    { amount: 200, name: '1 Month Access (200 Birr)', label: '1 Month (200 ETB)' },
-                    { amount: 600, name: '3 Months Access (600 Birr)', label: '3 Months (600 ETB)' },
-                    { amount: 1000, name: '6 Months Access (1,000 Birr)', label: '6 Months (1,000 ETB)' },
-                  ].map((tier) => {
-                    const isSelected =
-                      (tier.amount === 1000 && (previewSubmission.amount >= 1000 || previewSubmission.planName.toLowerCase().includes('6'))) ||
-                      (tier.amount === 600 && previewSubmission.amount === 600 && !previewSubmission.planName.toLowerCase().includes('6')) ||
-                      (tier.amount === 200 && previewSubmission.amount <= 200 && !previewSubmission.planName.toLowerCase().includes('6') && !previewSubmission.planName.toLowerCase().includes('3'));
-
-                    return (
-                      <button
-                        key={tier.amount}
-                        type="button"
-                        onClick={async () => {
-                          await updatePaymentPlan(previewSubmission.id, tier.name, tier.amount, previewSubmission.userPhone);
-                          setPreviewSubmission({
-                            ...previewSubmission,
-                            planName: tier.name,
-                            amount: tier.amount,
-                          });
-                          success('Plan Adjusted', `Set to ${tier.label} for ${previewSubmission.userName}`);
-                        }}
-                        className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold border transition-all cursor-pointer text-center ${
-                          isSelected
-                            ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-xs'
-                            : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400'
-                        }`}
-                      >
-                        {tier.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewSubmission(null)}
+                className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer shrink-0"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
 
-            {/* High-Res Image Container */}
-            <div className="rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-black flex items-center justify-center max-h-[55vh]">
+            {/* Receipt Image (Maximal view area, minimal margins) */}
+            <div className="p-2.5 sm:p-3 bg-zinc-950/95 flex items-center justify-center min-h-[200px] max-h-[58vh] sm:max-h-[64vh]">
               {previewSubmission.screenshotUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={previewSubmission.screenshotUrl}
-                  alt="Payment Receipt Screenshot"
+                  alt={`Receipt for ${previewSubmission.userName}`}
                   referrerPolicy="no-referrer"
-                  className="max-h-[50vh] w-auto object-contain"
+                  className="max-h-[54vh] sm:max-h-[60vh] w-auto max-w-full object-contain rounded-lg select-none"
                 />
               ) : (
-                <div className="p-8 text-center text-zinc-500 text-xs">No screenshot image available</div>
+                <div className="py-12 text-center text-zinc-400 text-xs space-y-2">
+                  <AlertCircle className="w-8 h-8 mx-auto text-zinc-600" />
+                  <p>No receipt image uploaded</p>
+                </div>
               )}
             </div>
 
-            {previewSubmission.screenshotUrl && (
-              <div className="text-right">
-                <a
-                  href={previewSubmission.screenshotUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-900 dark:hover:text-white underline"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" /> Open Image in New Tab
-                </a>
-              </div>
-            )}
-
-            {/* Modal Actions */}
-            <div className="flex flex-wrap justify-between items-center gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
-              <div className="flex items-center gap-2">
-                <Button variant="secondary" size="sm" onClick={() => setPreviewSubmission(null)}>
-                  Close
-                </Button>
-                <button
-                  type="button"
-                  onClick={() => setItemToDelete(previewSubmission)}
-                  className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 px-2 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" /> Delete Record
-                </button>
-              </div>
+            {/* Compact Action Footer */}
+            <div className="px-3.5 py-2.5 flex items-center justify-between gap-2 border-t border-zinc-100 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPreviewSubmission(null)}
+                className="text-xs h-8 px-3"
+              >
+                Close
+              </Button>
 
               <div className="flex items-center gap-2">
                 {previewSubmission.status !== 'rejected' && (
@@ -2072,7 +2015,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                       info('Rejected', 'Marked transaction as rejected');
                       setPreviewSubmission(null);
                     }}
-                    className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800/80 transition-colors cursor-pointer"
+                    className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 transition-colors cursor-pointer h-8"
                   >
                     <X className="w-3.5 h-3.5" /> Reject
                   </button>
@@ -2083,12 +2026,12 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                     type="button"
                     onClick={() => {
                       approvePayment(previewSubmission.id);
-                      success('Payment Approved!', `Activated subscriber ${previewSubmission.userPhone}`);
+                      success('Approved', `Activated for ${previewSubmission.userName}`);
                       setPreviewSubmission(null);
                     }}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 shadow-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-xs transition-all cursor-pointer h-8"
                   >
-                    <Check className="w-4 h-4" /> Approve & Activate
+                    <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Approve
                   </button>
                 )}
               </div>

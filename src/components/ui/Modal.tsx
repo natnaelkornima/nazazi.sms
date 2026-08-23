@@ -10,6 +10,9 @@ export interface ModalProps {
   description?: string;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
+  noPadding?: boolean;
+  bodyClassName?: string;
+  className?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -19,6 +22,9 @@ export const Modal: React.FC<ModalProps> = ({
   description,
   children,
   maxWidth = 'md',
+  noPadding = false,
+  bodyClassName,
+  className,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -62,7 +68,8 @@ export const Modal: React.FC<ModalProps> = ({
             transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
             className={cn(
               'relative w-full bg-white dark:bg-zinc-900 border border-zinc-200/90 dark:border-zinc-800 rounded-2xl sm:rounded-3xl shadow-2xl z-10 overflow-hidden text-zinc-900 dark:text-zinc-100',
-              maxWidths[maxWidth]
+              maxWidths[maxWidth],
+              className
             )}
           >
             {(title || description) && (
@@ -86,13 +93,13 @@ export const Modal: React.FC<ModalProps> = ({
             {!title && (
               <button
                 onClick={onClose}
-                className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 z-30 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors p-1.5 sm:p-2 rounded-full bg-zinc-100/90 dark:bg-zinc-800/90 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer backdrop-blur-md shadow-2xs"
+                className="absolute top-3 right-3 z-30 text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition-colors p-1.5 rounded-full bg-zinc-100/90 dark:bg-zinc-800/90 hover:bg-zinc-200 dark:hover:bg-zinc-700 cursor-pointer backdrop-blur-md shadow-2xs"
                 aria-label="Close modal"
               >
-                <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                <X className="w-4 h-4" />
               </button>
             )}
-            <div className="p-5 sm:p-6">{children}</div>
+            <div className={cn(noPadding ? '' : 'p-5 sm:p-6', bodyClassName)}>{children}</div>
           </motion.div>
         </div>
       )}
