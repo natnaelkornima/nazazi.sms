@@ -32,9 +32,10 @@ interface SubmittedRegistration {
 export default function RegisterPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Form State (strictly name, phone_number, and payment image)
+  // Form State (name, phone_number, plan, and payment image)
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [selectedPlan, setSelectedPlan] = useState('6m');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
 
@@ -167,9 +168,20 @@ export default function RegisterPage() {
         console.warn('Image compression fallback:', compErr);
       }
 
+      const planNameStr =
+        selectedPlan === '6m'
+          ? '6 Months Access (1,000 Birr)'
+          : selectedPlan === '3m'
+          ? '3 Months Access (600 Birr)'
+          : '1 Month Access (200 Birr)';
+
+      const planAmountNum = selectedPlan === '6m' ? 1000 : selectedPlan === '3m' ? 600 : 200;
+
       const formData = new FormData();
       formData.append('name', name.trim());
       formData.append('phone_number', phone.trim());
+      formData.append('plan_name', planNameStr);
+      formData.append('amount', String(planAmountNum));
       formData.append('payment_image', fileToUpload);
 
       const response = await fetch('/api/register', {
@@ -379,7 +391,40 @@ export default function RegisterPage() {
                     )}
                   </div>
 
-                  {/* Field 3: Payment Image Upload */}
+                  {/* Field 3: Select Plan */}
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">
+                      Selected Plan
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: '1m', name: '1 Month', price: '200 Birr' },
+                        { id: '3m', name: '3 Months', price: '600 Birr' },
+                        { id: '6m', name: '6 Months', price: '1,000 Birr', tag: 'Popular' },
+                      ].map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setSelectedPlan(p.id)}
+                          className={`relative p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            selectedPlan === p.id
+                              ? 'border-white bg-zinc-800 text-white shadow-xs'
+                              : 'border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:border-zinc-700'
+                          }`}
+                        >
+                          {p.tag && (
+                            <span className="absolute -top-2 right-2 px-1.5 py-0.2 rounded-full bg-amber-400 text-zinc-950 font-black text-[9px] uppercase">
+                              {p.tag}
+                            </span>
+                          )}
+                          <p className="text-xs font-bold leading-tight text-zinc-100">{p.name}</p>
+                          <p className="text-[11px] font-mono font-semibold text-zinc-400 mt-0.5">{p.price}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Field 4: Payment Image Upload */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="block text-xs font-bold text-zinc-300 uppercase tracking-wider">

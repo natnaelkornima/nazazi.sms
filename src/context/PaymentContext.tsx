@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { PaymentSubmission, PaymentStatus } from '../types';
 import { canonicalPhone, phoneMatches } from '../lib/validation';
+import { normalizePlanAndAmount } from '../lib/planUtils';
 
 export interface DatabaseConnectionInfo {
   isSupabaseConfigured: boolean;
@@ -101,8 +102,9 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const phone = record.phone_number || record.userPhone || '';
     const name = record.name || record.userName || 'Member';
     const imageUrl = record.payment_image_url || record.screenshotUrl || '';
-    const plan = record.plan_name || record.planName || 'Standard Plan (200 Birr)';
-    const amount = typeof record.amount === 'number' ? record.amount : 200;
+    const rawPlan = record.plan_name || record.planName;
+    const rawAmount = record.amount;
+    const { planName: plan, amount } = normalizePlanAndAmount(rawPlan, rawAmount);
     const submittedAt = record.created_at || record.submittedAt || new Date().toISOString();
 
     return {

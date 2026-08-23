@@ -190,11 +190,14 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
     }
   }, [smsLogs]);
 
-  // Derived counts
+  // Derived counts & revenue statistics
   const approvedSubmissions = submissions.filter((s) => s.status === 'approved');
   const pendingCount = submissions.filter((s) => s.status === 'pending').length;
   const approvedCount = approvedSubmissions.length;
   const rejectedCount = submissions.filter((s) => s.status === 'rejected').length;
+
+  const totalCollectedRevenue = approvedSubmissions.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
+  const totalPotentialRevenue = submissions.reduce((sum, s) => sum + (Number(s.amount) || 0), 0);
 
   // Filtered Payments for table
   const filteredSubmissions = submissions.filter((sub) => {
@@ -541,7 +544,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
       </div>
 
       {/* 2. Top Metric Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div
           onClick={() => {
             setActiveTab('approvals');
@@ -554,11 +557,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
           }`}
         >
           <div className="flex items-center justify-between text-amber-600 dark:text-amber-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">1. Pending Approvals</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">1. Pending</span>
             <Clock className="w-4 h-4" />
           </div>
           <p className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1">{pendingCount}</p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Need receipt verification</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Need verification</p>
         </div>
 
         <div
@@ -573,11 +576,30 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
           }`}
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">2. Approved Members</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider opacity-80">2. Approved</span>
             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
           </div>
           <p className="text-2xl font-extrabold mt-1">{approvedCount}</p>
-          <p className="text-[11px] opacity-70 mt-0.5">Ready for SMS delivery</p>
+          <p className="text-[11px] opacity-70 mt-0.5">Ready for SMS</p>
+        </div>
+
+        <div
+          onClick={() => {
+            setActiveTab('approvals');
+            setStatusFilter('approved');
+          }}
+          className="p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700 transition-all cursor-pointer"
+        >
+          <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400">
+            <span className="text-[11px] font-bold uppercase tracking-wider">3. Revenue</span>
+            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-sm bg-emerald-100 dark:bg-emerald-950/80 text-emerald-800 dark:text-emerald-300">ETB</span>
+          </div>
+          <p className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1">
+            {totalCollectedRevenue.toLocaleString()}
+          </p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">
+            Total verified collections
+          </p>
         </div>
 
         <div
@@ -589,11 +611,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
           }`}
         >
           <div className="flex items-center justify-between text-sky-600 dark:text-sky-400">
-            <span className="text-[11px] font-bold uppercase tracking-wider">3. SMS Dispatches</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider">4. Dispatches</span>
             <History className="w-4 h-4" />
           </div>
           <p className="text-2xl font-extrabold text-zinc-900 dark:text-zinc-50 mt-1">{smsLogs.length}</p>
-          <p className="text-[11px] text-zinc-500 mt-0.5">Logged delivery history</p>
+          <p className="text-[11px] text-zinc-500 mt-0.5">Delivery history</p>
         </div>
       </div>
 
@@ -813,8 +835,22 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                       </td>
 
                       <td className="p-3.5">
-                        <p className="font-bold text-zinc-800 dark:text-zinc-200">{sub.planName}</p>
-                        <p className="text-[11px] font-mono text-zinc-500 font-semibold">{sub.amount} ETB</p>
+                        <div className="space-y-1">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wide ${
+                              sub.amount >= 1000 || sub.planName.toLowerCase().includes('6')
+                                ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                                : sub.amount >= 600 || sub.planName.toLowerCase().includes('3')
+                                ? 'bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 border border-purple-300 dark:border-purple-800'
+                                : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700'
+                            }`}
+                          >
+                            {sub.planName}
+                          </span>
+                          <p className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                            {Number(sub.amount).toLocaleString()} ETB
+                          </p>
+                        </div>
                       </td>
 
                       <td className="p-3.5">

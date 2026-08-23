@@ -1,5 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { canonicalPhone, phoneMatches } from './validation';
+import { normalizePlanAndAmount } from './planUtils';
 
 function sanitizeSupabaseUrl(rawUrl: string): string {
   if (!rawUrl) return '';
@@ -146,19 +147,42 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
     ''
   ).trim();
 
-  const planStr = String(
+  const rawPlanValue =
     row.plan_name ||
     row.plan ||
     row.subscription_plan ||
-    'Standard Plan (200 Birr)'
-  );
+    row.package ||
+    row.tier ||
+    row.selected_plan ||
+    row.plan_type ||
+    row.pricing_plan ||
+    row.membership ||
+    '';
 
-  const amountVal =
-    typeof row.amount === 'number'
+  const rawAmountValue =
+    row.amount !== undefined
       ? row.amount
-      : typeof row.price === 'number'
+      : row.price !== undefined
       ? row.price
-      : 200;
+      : row.fee !== undefined
+      ? row.fee
+      : row.cost !== undefined
+      ? row.cost
+      : undefined;
+
+  const rawNotesValue =
+    row.notes ||
+    row.description ||
+    row.remark ||
+    row.comment ||
+    row.details ||
+    '';
+
+  const { planName: planStr, amount: amountVal } = normalizePlanAndAmount(
+    rawPlanValue,
+    rawAmountValue,
+    rawNotesValue
+  );
 
   const rawStatus = String(row.status || 'pending').toLowerCase();
   const status: 'pending' | 'approved' | 'rejected' =
@@ -191,13 +215,18 @@ export async function saveRegistrationToSupabase(data: {
   const fallbackId = `reg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const nowIso = new Date().toISOString();
 
+  const { planName: normalizedPlanName, amount: normalizedAmount } = normalizePlanAndAmount(
+    data.plan_name,
+    data.amount
+  );
+
   const record: RegistrationRecord = {
     id: fallbackId,
     name: data.name.trim(),
     phone_number: data.phone_number.trim(),
     payment_image_url: data.payment_image_url,
-    plan_name: data.plan_name || 'Standard Plan (200 Birr)',
-    amount: data.amount ?? 200,
+    plan_name: normalizedPlanName,
+    amount: normalizedAmount,
     status: data.status || 'pending',
     created_at: nowIso,
   };
@@ -279,6 +308,21 @@ export async function saveRegistrationToSupabase(data: {
           } else if (missingCol === 'screenshot_url') {
             delete payload.screenshot_url;
             payload.receipt_url = record.payment_image_url;
+          } else if (missingCol === 'plan_name') {
+            delete payload.plan_name;
+            payload.plan = record.plan_name;
+          } else if (missingCol === 'plan') {
+            delete payload.plan;
+            payload.subscription_plan = record.plan_name;
+          } else if (missingCol === 'subscription_plan') {
+            delete payload.subscription_plan;
+            payload.tier = record.plan_name;
+          } else if (missingCol === 'amount') {
+            delete payload.amount;
+            payload.price = record.amount;
+          } else if (missingCol === 'price') {
+            delete payload.price;
+            payload.fee = record.amount;
           } else {
             delete payload[missingCol];
           }
