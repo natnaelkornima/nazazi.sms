@@ -791,7 +791,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
               <table className="w-full text-left text-xs">
                 <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-500 font-semibold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
                   <tr>
-                    <th className="p-3.5 pl-4 w-8">
+                    <th className="py-3 px-3 pl-4 w-10 text-center">
                       <input
                         type="checkbox"
                         checked={
@@ -803,23 +803,24 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                         title="Select all"
                       />
                     </th>
-                    <th className="p-3.5">Member Name & Phone</th>
-                    <th className="p-3.5">Plan / Amount</th>
-                    <th className="p-3.5">Receipt Image</th>
-                    <th className="p-3.5">Date</th>
-                    <th className="p-3.5">Status</th>
-                    <th className="p-3.5 pr-4 text-right">Actions</th>
+                    <th className="py-3 px-2 w-12 text-center text-[11px] font-mono text-zinc-400">#</th>
+                    <th className="py-3 px-3">Member Name & Phone</th>
+                    <th className="py-3 px-3">Plan / Amount</th>
+                    <th className="py-3 px-3">Receipt Image</th>
+                    <th className="py-3 px-3">Date</th>
+                    <th className="py-3 px-3">Status</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
-                  {filteredSubmissions.map((sub) => (
+                  {filteredSubmissions.map((sub, index) => (
                     <tr
                       key={sub.id}
                       className={`hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors ${
                         selectedIds.includes(sub.id) ? 'bg-zinc-50/90 dark:bg-zinc-800/60' : ''
                       }`}
                     >
-                      <td className="p-3.5 pl-4 w-8">
+                      <td className="py-3 px-3 pl-4 w-10 text-center">
                         <input
                           type="checkbox"
                           checked={selectedIds.includes(sub.id)}
@@ -827,7 +828,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                           className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 accent-zinc-900 dark:accent-zinc-100 cursor-pointer"
                         />
                       </td>
-                      <td className="p-3.5">
+                      <td className="py-3 px-2 w-12 text-center text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500">
+                        {index + 1}
+                      </td>
+                      <td className="py-3 px-3">
                         <div className="space-y-0.5">
                           <p className="font-bold text-zinc-900 dark:text-zinc-100">{sub.userName}</p>
                           <p className="text-[11px] font-mono text-zinc-700 dark:text-zinc-300 font-bold flex items-center gap-1">
@@ -836,7 +840,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                         </div>
                       </td>
 
-                      <td className="p-3.5">
+                      <td className="py-3 px-3">
                         <div className="space-y-1.5">
                           <div className="relative inline-flex items-center">
                             <select
@@ -879,11 +883,11 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                         </div>
                       </td>
 
-                      <td className="p-3.5">
+                      <td className="py-3 px-3">
                         {sub.screenshotUrl ? (
                           <div
                             onClick={() => setPreviewSubmission(sub)}
-                            className="relative h-12 w-20 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-950 cursor-pointer group shadow-xs"
+                            className="relative h-11 w-18 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-950 cursor-pointer group shadow-xs"
                             title="Click to view full receipt image"
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -902,78 +906,78 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                         )}
                       </td>
 
-                      <td className="p-3.5 text-zinc-500 font-mono text-[11px]">
+                      <td className="py-3 px-3 text-zinc-500 font-mono text-[11px]">
                         {new Date(sub.submittedAt).toLocaleDateString()}
                       </td>
 
-                      <td className="p-3.5">
+                      <td className="py-3 px-3">
                         {sub.status === 'pending' && <Badge variant="amber" dot>Pending</Badge>}
                         {sub.status === 'approved' && <Badge variant="zinc" dot>Approved</Badge>}
                         {sub.status === 'rejected' && <Badge variant="danger">Rejected</Badge>}
                       </td>
 
-                      <td className="p-3.5 pr-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
                           {sub.status === 'pending' && (
-                            <>
-                              <Button
-                                size="sm"
+                            <div className="inline-flex items-center bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
+                              <button
+                                type="button"
                                 onClick={() => {
                                   approvePayment(sub.id);
                                   success('Approved!', `Activated SMS subscription for ${sub.userPhone}`);
                                 }}
-                                className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 font-bold text-xs"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 transition-all cursor-pointer"
+                                title="Approve and activate"
                               >
-                                <Check className="w-3.5 h-3.5 mr-1" /> Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="danger"
+                                <Check className="w-3.5 h-3.5" /> Approve
+                              </button>
+                              <div className="w-[1px] h-3.5 bg-zinc-300 dark:bg-zinc-700 mx-0.5" />
+                              <button
+                                type="button"
                                 onClick={() => {
                                   rejectPayment(sub.id);
                                   info('Rejected', `Marked ${sub.userPhone} as rejected`);
                                 }}
-                                className="text-xs"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-600 transition-all cursor-pointer"
+                                title="Reject registration"
                               >
-                                Reject
-                              </Button>
-                            </>
+                                <X className="w-3.5 h-3.5" /> Reject
+                              </button>
+                            </div>
                           )}
 
                           {sub.status === 'approved' && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            <button
+                              type="button"
                               onClick={() => {
                                 setSelectedPhone(sub.userPhone);
                                 setActiveTab('send_sms');
                                 setTargetType('single_member');
                               }}
-                              className="text-[11px] font-bold"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
                             >
-                              <Send className="w-3 h-3 mr-1" /> Send SMS
-                            </Button>
+                              <Send className="w-3 h-3" /> Send SMS
+                            </button>
                           )}
 
                           {sub.status === 'rejected' && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
+                            <button
+                              type="button"
                               onClick={() => {
                                 approvePayment(sub.id);
                                 success('Approved', `Status updated to active for ${sub.userPhone}`);
                               }}
-                              className="text-xs"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
                             >
-                              Re-Approve
-                            </Button>
+                              <Check className="w-3 h-3" /> Re-Approve
+                            </button>
                           )}
 
                           <button
                             type="button"
                             id={`delete-btn-${sub.id}`}
                             onClick={() => setItemToDelete(sub)}
-                            className="p-1.5 text-zinc-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30"
+                            className="p-1.5 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer ml-1"
                             title="Delete this record"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -1352,51 +1356,47 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             )}
 
             {/* Modal Actions */}
-            <div className="flex justify-between items-center pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex flex-wrap justify-between items-center gap-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
               <div className="flex items-center gap-2">
                 <Button variant="secondary" size="sm" onClick={() => setPreviewSubmission(null)}>
                   Close
                 </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={() => {
-                    setItemToDelete(previewSubmission);
-                  }}
-                  leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-                  className="text-xs"
+                <button
+                  type="button"
+                  onClick={() => setItemToDelete(previewSubmission)}
+                  className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 px-2 py-1.5 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
                 >
-                  Delete Record
-                </Button>
+                  <Trash2 className="w-3.5 h-3.5" /> Delete Record
+                </button>
               </div>
 
               <div className="flex items-center gap-2">
                 {previewSubmission.status !== 'rejected' && (
-                  <Button
-                    variant="secondary"
-                    size="sm"
+                  <button
+                    type="button"
                     onClick={() => {
                       rejectPayment(previewSubmission.id);
                       info('Rejected', 'Marked transaction as rejected');
                       setPreviewSubmission(null);
                     }}
+                    className="inline-flex items-center gap-1 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 border border-rose-200 dark:border-rose-800/80 transition-colors cursor-pointer"
                   >
-                    Reject
-                  </Button>
+                    <X className="w-3.5 h-3.5" /> Reject
+                  </button>
                 )}
 
                 {previewSubmission.status !== 'approved' && (
-                  <Button
-                    size="sm"
+                  <button
+                    type="button"
                     onClick={() => {
                       approvePayment(previewSubmission.id);
                       success('Payment Approved!', `Activated subscriber ${previewSubmission.userPhone}`);
                       setPreviewSubmission(null);
                     }}
-                    className="bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 font-bold"
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 shadow-xs transition-colors cursor-pointer"
                   >
-                    <Check className="w-4 h-4 mr-1" /> Approve & Activate
-                  </Button>
+                    <Check className="w-4 h-4" /> Approve & Activate
+                  </button>
                 )}
               </div>
             </div>
