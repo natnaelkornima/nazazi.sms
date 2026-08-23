@@ -107,6 +107,23 @@ function normalizePhoneKey(phone: string): string {
   return (phone || '').trim().replace(/[\s\-\(\)\.]/g, '').replace(/^\+/, '');
 }
 
+// Persistent map to track registered plans & amounts even if Supabase schema lacks plan columns
+const planMetaCache = new Map<string, { planName: string; amount: number }>();
+
+function recordPlanMeta(id: string | undefined, phone: string | undefined, planName: string, amount: number) {
+  if (id) {
+    planMetaCache.set(id, { planName, amount });
+  }
+  const cleanPhone = normalizePhoneKey(phone);
+  if (cleanPhone) {
+    planMetaCache.set(cleanPhone, { planName, amount });
+    const last8 = cleanPhone.slice(-8);
+    if (last8.length >= 7) {
+      planMetaCache.set(last8, { planName, amount });
+    }
+  }
+}
+
 /**
  * Extracts normalized row data from any Supabase table column naming convention
  */
@@ -178,11 +195,23 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
     row.details ||
     '';
 
-  const { planName: planStr, amount: amountVal } = normalizePlanAndAmount(
+  let { planName: planStr, amount: amountVal } = normalizePlanAndAmount(
     rawPlanValue,
     rawAmountValue,
     rawNotesValue
   );
+
+  // Check if we have cached plan metadata for this phone / ID (e.g. user registered for 600 or 1000)
+  const cleanPhone = normalizePhoneKey(phoneStr);
+  const cachedPlan =
+    planMetaCache.get(idStr) ||
+    (cleanPhone ? planMetaCache.get(cleanPhone) : undefined) ||
+    (cleanPhone && cleanPhone.length >= 8 ? planMetaCache.get(cleanPhone.slice(-8)) : undefined);
+
+  if (cachedPlan && (cachedPlan.amount > 200 || !rawPlanValue || amountVal === 200)) {
+    planStr = cachedPlan.planName;
+    amountVal = cachedPlan.amount;
+  }
 
   const rawStatus = String(row.status || 'pending').toLowerCase();
   const status: 'pending' | 'approved' | 'rejected' =
@@ -272,6 +301,9 @@ export async function saveRegistrationToSupabase(data: {
     status: data.status || 'pending',
     created_at: nowIso,
   };
+
+  // Record plan metadata in memory cache
+  recordPlanMeta(fallbackId, record.phone_number, record.plan_name, record.amount);
 
   // Always keep in-memory cache updated immediately
   inMemoryRegistrations.unshift(record);
@@ -377,6 +409,11 @@ export async function saveRegistrationToSupabase(data: {
       if (!insertedRecord.name) insertedRecord.name = record.name;
       if (!insertedRecord.phone_number) insertedRecord.phone_number = record.phone_number;
       if (!insertedRecord.payment_image_url) insertedRecord.payment_image_url = record.payment_image_url;
+      // Always retain authentic chosen plan and amount
+      insertedRecord.plan_name = record.plan_name;
+      insertedRecord.amount = record.amount;
+
+      recordPlanMeta(insertedRecord.id, insertedRecord.phone_number, record.plan_name, record.amount);
 
       // Update in-memory cache with the server ID
       inMemoryRegistrations = inMemoryRegistrations.map((r) => (r.id === fallbackId ? insertedRecord : r));
@@ -470,6 +507,11 @@ export async function saveRegistrationToSupabase(data: {
           if (!insertedRecord.name) insertedRecord.name = record.name;
           if (!insertedRecord.phone_number) insertedRecord.phone_number = record.phone_number;
           if (!insertedRecord.payment_image_url) insertedRecord.payment_image_url = record.payment_image_url;
+          // Always retain authentic chosen plan and amount
+          insertedRecord.plan_name = record.plan_name;
+          insertedRecord.amount = record.amount;
+
+          recordPlanMeta(insertedRecord.id, insertedRecord.phone_number, record.plan_name, record.amount);
 
           inMemoryRegistrations = inMemoryRegistrations.map((r) => (r.id === fallbackId ? insertedRecord : r));
           return { record: insertedRecord, savedToSupabase: true };
@@ -655,6 +697,18 @@ export async function getAllRegistrations(): Promise<{
         const parsed = extractRowData(row);
         const cleanPhone = normalizePhoneKey(parsed.phone_number);
 
+        // Check if there is an in-memory or cached plan metadata that has authentic amount (e.g. 600 or 1000)
+        const memMatch = inMemoryRegistrations.find(
+          (m) => m.id === parsed.id || (cleanPhone && phoneMatches(m.phone_number, cleanPhone))
+        );
+        let finalPlanName = parsed.plan_name;
+        let finalAmount = parsed.amount;
+
+        if (memMatch && memMatch.amount > 200 && finalAmount === 200) {
+          finalPlanName = memMatch.plan_name;
+          finalAmount = memMatch.amount;
+        }
+
         const cachedOverride =
           statusOverridesMap.get(parsed.id) ||
           (cleanPhone ? statusOverridesMap.get(cleanPhone) : undefined);
@@ -666,6 +720,8 @@ export async function getAllRegistrations(): Promise<{
 
         return {
           ...parsed,
+          plan_name: finalPlanName,
+          amount: finalAmount,
           status: finalStatus,
           reviewed_at: parsed.reviewed_at || cachedOverride?.reviewed_at || null,
         };

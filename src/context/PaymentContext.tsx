@@ -155,31 +155,34 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
 
           setSubmissions((prev) => {
-            // Build lookup of any approved/rejected statuses to preserve approvals
-            const localStatuses = new Map<string, { status: PaymentStatus; reviewedAt?: string }>();
-
-            prev.forEach((p) => {
-              if (p.status === 'approved' || p.status === 'rejected') {
-                localStatuses.set(p.id, { status: p.status, reviewedAt: p.reviewedAt });
-                const clean = p.userPhone.replace(/\D/g, '');
-                if (clean) localStatuses.set(clean, { status: p.status, reviewedAt: p.reviewedAt });
-              }
-            });
-
             const merged = cleanList.map((item) => {
-              if (item.status === 'approved' || item.status === 'rejected') {
-                return item;
-              }
               const clean = item.userPhone.replace(/\D/g, '');
-              const localMatch = localStatuses.get(item.id) || (clean ? localStatuses.get(clean) : undefined);
-              if (localMatch && (localMatch.status === 'approved' || localMatch.status === 'rejected')) {
-                return {
-                  ...item,
-                  status: localMatch.status,
-                  reviewedAt: localMatch.reviewedAt || item.reviewedAt,
-                };
+              const prevItem = prev.find(
+                (p) => p.id === item.id || (clean && p.userPhone.replace(/\D/g, '') === clean)
+              );
+
+              let effectivePlanName = item.planName;
+              let effectiveAmount = item.amount;
+              if (prevItem && prevItem.amount > 200 && item.amount === 200) {
+                effectivePlanName = prevItem.planName;
+                effectiveAmount = prevItem.amount;
               }
-              return item;
+
+              let effectiveStatus = item.status;
+              let effectiveReviewedAt = item.reviewedAt;
+
+              if (prevItem && (prevItem.status === 'approved' || prevItem.status === 'rejected')) {
+                effectiveStatus = prevItem.status;
+                effectiveReviewedAt = prevItem.reviewedAt || item.reviewedAt;
+              }
+
+              return {
+                ...item,
+                planName: effectivePlanName,
+                amount: effectiveAmount,
+                status: effectiveStatus,
+                reviewedAt: effectiveReviewedAt,
+              };
             });
 
             // Also preserve any recently added local submissions not yet present in server response

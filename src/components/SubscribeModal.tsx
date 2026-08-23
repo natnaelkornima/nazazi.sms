@@ -40,11 +40,19 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
   const { language } = useLanguage();
   const isAmharic = language === 'am';
 
+  const getPlanIdFromStr = (str?: string): '1m' | '3m' | '6m' => {
+    if (!str) return '6m';
+    const lower = str.toLowerCase();
+    if (lower.includes('1 month') || lower.includes('የ1 ወር') || lower.includes('200')) return '1m';
+    if (lower.includes('3 month') || lower.includes('የ3 ወር') || lower.includes('600')) return '3m';
+    if (lower.includes('6 month') || lower.includes('የ6 ወር') || lower.includes('1000') || lower.includes('1,000')) return '6m';
+    return '6m';
+  };
+
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [direction, setDirection] = useState<1 | -1>(1);
 
-  const defaultPlan = initialPlan || (isAmharic ? 'የ6 ወር አገልግሎት (1000 ብር)' : '6 Months (1000 ETB)');
-  const [selectedPlan, setSelectedPlan] = useState<string>(defaultPlan);
+  const [selectedPlanId, setSelectedPlanId] = useState<'1m' | '3m' | '6m'>(() => getPlanIdFromStr(initialPlan));
   const [name, setName] = useState('');
   const [nameTouched, setNameTouched] = useState(false);
   const [phone, setPhone] = useState('');
@@ -73,7 +81,7 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
       setPhoneTouched(false);
       setScreenshotTouched(false);
       if (initialPlan) {
-        setSelectedPlan(initialPlan);
+        setSelectedPlanId(getPlanIdFromStr(initialPlan));
       }
     }
   }, [isOpen, initialPlan]);
@@ -87,12 +95,16 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
     }, 2000);
   };
 
-  const isSixMonth = selectedPlan.includes('6 Month') || selectedPlan.includes('የ6 ወር') || selectedPlan.includes('1000');
-  const isOneMonth = selectedPlan.includes('1 Month') || selectedPlan.includes('የ1 ወር') || selectedPlan.includes('200');
-  const planAmount = isSixMonth ? 1000 : isOneMonth ? 200 : 600;
-  const planLabel = isSixMonth
+  const planAmount = selectedPlanId === '6m' ? 1000 : selectedPlanId === '3m' ? 600 : 200;
+  const selectedPlan = selectedPlanId === '6m'
+    ? (isAmharic ? 'የ6 ወር አገልግሎት (1000 ብር)' : '6 Months Access (1,000 Birr)')
+    : selectedPlanId === '3m'
+    ? (isAmharic ? 'የ3 ወር አገልግሎት (600 ብር)' : '3 Months Access (600 Birr)')
+    : (isAmharic ? 'የ1 ወር አገልግሎት (200 ብር)' : '1 Month Access (200 Birr)');
+
+  const planLabel = selectedPlanId === '6m'
     ? (isAmharic ? 'የ6 ወር አገልግሎት' : '6 Months Access')
-    : isOneMonth
+    : selectedPlanId === '1m'
       ? (isAmharic ? 'የ1 ወር አገልግሎት' : '1 Month Access')
       : (isAmharic ? 'የ3 ወር አገልግሎት' : '3 Months Access');
 
@@ -228,12 +240,22 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
 
       // 4. Update state directly using the server's registered record (one-way live path)
       const reg = result?.registration;
+      const effectivePlanName =
+        (reg?.amount && reg.amount > 200) || (planAmount > 200 && reg?.amount === 200)
+          ? selectedPlan
+          : (reg?.plan_name || selectedPlan);
+
+      const effectiveAmount =
+        planAmount > 200
+          ? planAmount
+          : (reg?.amount || planAmount);
+
       const newSub = await submitPayment({
         id: reg?.id,
         userName: reg?.name || name.trim(),
         userPhone: reg?.phone_number || phone.trim(),
-        planName: reg?.plan_name || selectedPlan,
-        amount: reg?.amount || planAmount,
+        planName: effectivePlanName,
+        amount: effectiveAmount,
         payerName: reg?.name || name.trim(),
         transactionId: reg?.id
           ? `TXN-${String(reg.id).replace(/[^a-zA-Z0-9]/g, '').slice(-8).toUpperCase()}`
@@ -349,12 +371,12 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
               {/* Plan Choice Pills */}
               <div className="grid grid-cols-3 gap-2">
                 {plans.map((p) => {
-                  const isSelected = selectedPlan === p.fullPlan;
+                  const isSelected = selectedPlanId === p.id;
                   return (
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => setSelectedPlan(p.fullPlan)}
+                      onClick={() => setSelectedPlanId(p.id as '1m' | '3m' | '6m')}
                       className={`relative p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
                         isSelected
                           ? 'border-zinc-900 dark:border-white bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs'
