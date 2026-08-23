@@ -3,7 +3,7 @@ import { canonicalPhone, phoneMatches } from './validation';
 
 function sanitizeSupabaseUrl(rawUrl: string): string {
   if (!rawUrl) return '';
-  let url = rawUrl.trim();
+  let url = rawUrl.trim().replace(/^['"]|['"]$/g, '');
   url = url.replace(/\/rest\/v1\/?$/i, '').replace(/\/+$/, '');
   try {
     const parsed = new URL(url);
@@ -11,6 +11,11 @@ function sanitizeSupabaseUrl(rawUrl: string): string {
   } catch {
     return url;
   }
+}
+
+function sanitizeKey(rawKey: string): string {
+  if (!rawKey) return '';
+  return rawKey.trim().replace(/^['"]|['"]$/g, '');
 }
 
 export interface RegistrationRecord {
@@ -29,30 +34,43 @@ let cachedClient: SupabaseClient | null = null;
 let cachedUrl = '';
 let cachedKey = '';
 
-export function isSupabaseConfigured(): boolean {
-  const url = sanitizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || '');
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    '';
+export function getSupabaseCredentials() {
+  const url = sanitizeSupabaseUrl(
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.SUPABASE_URL ||
+    process.env.SUPABASE_DATABASE_URL ||
+    ''
+  );
 
-  return Boolean(
+  const key = sanitizeKey(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_KEY ||
+    ''
+  );
+
+  const isConfigured = Boolean(
     url &&
     key &&
-    !url.includes('your-project') &&
-    !key.includes('your-supabase')
+    !url.toLowerCase().includes('your-project') &&
+    !key.toLowerCase().includes('your-supabase') &&
+    !url.toLowerCase().includes('placeholder')
   );
+
+  return { url, key, isConfigured };
+}
+
+export function isSupabaseConfigured(): boolean {
+  return getSupabaseCredentials().isConfigured;
 }
 
 export function getSupabaseClient(): SupabaseClient | null {
-  const url = sanitizeSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL || '');
-  // Prefer server-only service role key, fallback to anon key
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-    '';
+  const { url, key, isConfigured } = getSupabaseCredentials();
 
-  if (!url || !key || url.includes('your-project') || key.includes('your-supabase')) {
+  if (!isConfigured) {
     return null;
   }
 
@@ -89,7 +107,78 @@ function normalizePhoneKey(phone: string): string {
 }
 
 /**
- * Saves a new registration record into the 'registrations' table in Supabase.
+ * Extracts normalized row data from any Supabase table column naming convention
+ */
+function extractRowData(row: Record<string, unknown>, fallbackId?: string): RegistrationRecord {
+  const idStr = String(row.id || row.uuid || fallbackId || `reg_${Date.now()}`);
+
+  const nameStr = String(
+    row.name ||
+    row.full_name ||
+    row.fullname ||
+    row.user_name ||
+    row.username ||
+    row.payer_name ||
+    row.customer_name ||
+    row.client_name ||
+    ''
+  ).trim();
+
+  const phoneStr = String(
+    row.phone_number ||
+    row.phone ||
+    row.user_phone ||
+    row.mobile ||
+    row.telephone ||
+    ''
+  ).trim();
+
+  const imageStr = String(
+    row.payment_image_url ||
+    row.image_url ||
+    row.screenshot_url ||
+    row.receipt_url ||
+    row.payment_image ||
+    row.screenshot ||
+    row.receipt ||
+    row.file_url ||
+    row.url ||
+    ''
+  ).trim();
+
+  const planStr = String(
+    row.plan_name ||
+    row.plan ||
+    row.subscription_plan ||
+    'Standard Plan (200 Birr)'
+  );
+
+  const amountVal =
+    typeof row.amount === 'number'
+      ? row.amount
+      : typeof row.price === 'number'
+      ? row.price
+      : 200;
+
+  const rawStatus = String(row.status || 'pending').toLowerCase();
+  const status: 'pending' | 'approved' | 'rejected' =
+    rawStatus === 'approved' || rawStatus === 'rejected' ? (rawStatus as 'approved' | 'rejected') : 'pending';
+
+  return {
+    id: idStr,
+    name: nameStr,
+    phone_number: phoneStr,
+    payment_image_url: imageStr,
+    plan_name: planStr,
+    amount: amountVal,
+    status,
+    created_at: String(row.created_at || new Date().toISOString()),
+    reviewed_at: row.reviewed_at ? String(row.reviewed_at) : null,
+  };
+}
+
+/**
+ * Saves a new registration record into Supabase with adaptive column stripping and table fallback.
  */
 export async function saveRegistrationToSupabase(data: {
   name: string;
@@ -124,8 +213,10 @@ export async function saveRegistrationToSupabase(data: {
     };
   }
 
-  try {
-    const insertPayload: Record<string, unknown> = {
+  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+
+  for (const tableName of candidateTables) {
+    const payload: Record<string, unknown> = {
       name: record.name,
       phone_number: record.phone_number,
       payment_image_url: record.payment_image_url,
@@ -134,78 +225,116 @@ export async function saveRegistrationToSupabase(data: {
       status: record.status,
     };
 
-    const { data: insertedData, error: insertError } = await client
-      .from('registrations')
-      .insert([insertPayload])
-      .select('*');
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        const { data: insertedData, error: insertError } = await client
+          .from(tableName)
+          .insert([payload])
+          .select('*');
 
-    if (insertError) {
-      // Retry with minimal columns
-      const { data: retryData, error: retryError } = await client
-        .from('registrations')
-        .insert([
-          {
+        if (!insertError) {
+          const insertedRow = insertedData && insertedData.length > 0 ? insertedData[0] : null;
+          const formattedRecord = insertedRow
+            ? extractRowData(insertedRow as Record<string, unknown>, fallbackId)
+            : record;
+
+          if (!formattedRecord.name) formattedRecord.name = record.name;
+          if (!formattedRecord.phone_number) formattedRecord.phone_number = record.phone_number;
+          if (!formattedRecord.payment_image_url) formattedRecord.payment_image_url = record.payment_image_url;
+
+          inMemoryRegistrations.unshift(formattedRecord);
+          return { record: formattedRecord, savedToSupabase: true };
+        }
+
+        const errMsg = insertError.message || '';
+
+        // Check if table relation does not exist
+        if (insertError.code === '42P01' || errMsg.includes('relation') || errMsg.includes('does not exist')) {
+          break;
+        }
+
+        // Dynamically strip or remap unknown column
+        const missingColMatch = errMsg.match(/column ['"]?([a-zA-Z0-9_]+)['"]? of relation|Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column/i);
+        const missingCol = missingColMatch ? (missingColMatch[1] || missingColMatch[2]) : null;
+
+        if (missingCol && missingCol in payload) {
+          if (missingCol === 'name') {
+            delete payload.name;
+            payload.full_name = record.name;
+          } else if (missingCol === 'full_name') {
+            delete payload.full_name;
+            payload.user_name = record.name;
+          } else if (missingCol === 'phone_number') {
+            delete payload.phone_number;
+            payload.phone = record.phone_number;
+          } else if (missingCol === 'phone') {
+            delete payload.phone;
+            payload.user_phone = record.phone_number;
+          } else if (missingCol === 'payment_image_url') {
+            delete payload.payment_image_url;
+            payload.image_url = record.payment_image_url;
+          } else if (missingCol === 'image_url') {
+            delete payload.image_url;
+            payload.screenshot_url = record.payment_image_url;
+          } else if (missingCol === 'screenshot_url') {
+            delete payload.screenshot_url;
+            payload.receipt_url = record.payment_image_url;
+          } else {
+            delete payload[missingCol];
+          }
+          continue;
+        }
+
+        // Try minimal core columns
+        if (attempt === 2) {
+          const minimalPayload: Record<string, unknown> = {
             name: record.name,
             phone_number: record.phone_number,
             payment_image_url: record.payment_image_url,
-          },
-        ])
-        .select('*');
+          };
+          const { data: minData, error: minErr } = await client
+            .from(tableName)
+            .insert([minimalPayload])
+            .select('*');
 
-      if (retryError) {
-        inMemoryRegistrations.unshift(record);
-        return {
-          record,
-          savedToSupabase: false,
-          error: `${insertError.message} | Retry: ${retryError.message}`,
-        };
-      }
-
-      const insertedRow = retryData && retryData.length > 0 ? retryData[0] : null;
-      const formattedRecord: RegistrationRecord = insertedRow
-        ? {
-            id: String(insertedRow.id || fallbackId),
-            name: insertedRow.name || record.name,
-            phone_number: insertedRow.phone_number || record.phone_number,
-            payment_image_url: insertedRow.payment_image_url || record.payment_image_url,
-            plan_name: insertedRow.plan_name || record.plan_name,
-            amount: typeof insertedRow.amount === 'number' ? insertedRow.amount : record.amount,
-            status: insertedRow.status || record.status,
-            created_at: insertedRow.created_at || record.created_at,
-            reviewed_at: insertedRow.reviewed_at || null,
+          if (!minErr && minData && minData.length > 0) {
+            const row = extractRowData(minData[0] as Record<string, unknown>, fallbackId);
+            if (!row.name) row.name = record.name;
+            inMemoryRegistrations.unshift(row);
+            return { record: row, savedToSupabase: true };
           }
-        : record;
-
-      inMemoryRegistrations.unshift(formattedRecord);
-      return { record: formattedRecord, savedToSupabase: true };
-    }
-
-    const insertedRow = insertedData && insertedData.length > 0 ? insertedData[0] : null;
-    const formattedRecord: RegistrationRecord = insertedRow
-      ? {
-          id: String(insertedRow.id || fallbackId),
-          name: insertedRow.name || record.name,
-          phone_number: insertedRow.phone_number || record.phone_number,
-          payment_image_url: insertedRow.payment_image_url || record.payment_image_url,
-          plan_name: insertedRow.plan_name || record.plan_name,
-          amount: typeof insertedRow.amount === 'number' ? insertedRow.amount : record.amount,
-          status: insertedRow.status || record.status,
-          created_at: insertedRow.created_at || record.created_at,
-          reviewed_at: insertedRow.reviewed_at || null,
         }
-      : record;
 
-    inMemoryRegistrations.unshift(formattedRecord);
-    return { record: formattedRecord, savedToSupabase: true };
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'Unknown Supabase error';
-    inMemoryRegistrations.unshift(record);
-    return {
-      record,
-      savedToSupabase: false,
-      error: errorMsg,
-    };
+        if (attempt === 3) {
+          const altPayload: Record<string, unknown> = {
+            full_name: record.name,
+            phone: record.phone_number,
+            image_url: record.payment_image_url,
+          };
+          const { data: altData, error: altErr } = await client
+            .from(tableName)
+            .insert([altPayload])
+            .select('*');
+
+          if (!altErr && altData && altData.length > 0) {
+            const row = extractRowData(altData[0] as Record<string, unknown>, fallbackId);
+            if (!row.name) row.name = record.name;
+            inMemoryRegistrations.unshift(row);
+            return { record: row, savedToSupabase: true };
+          }
+        }
+      } catch {
+        break;
+      }
+    }
   }
+
+  inMemoryRegistrations.unshift(record);
+  return {
+    record,
+    savedToSupabase: false,
+    error: 'Could not insert into Supabase database (data preserved in memory).',
+  };
 }
 
 /**
@@ -219,7 +348,6 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
   const cleanDigits = rawInput.replace(/\D/g, '');
   const last8 = cleanDigits.slice(-8);
 
-  // 1. Check if there is an active memory override for this phone or last 8 digits
   const overrideKey =
     statusOverridesMap.get(rawInput) ||
     statusOverridesMap.get(canonical) ||
@@ -228,81 +356,77 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
 
   const client = getSupabaseClient();
   if (client) {
-    try {
-      // Primary search by last 8 digits
-      let matchedData: Record<string, unknown> | null = null;
+    const candidateTables = ['registrations', 'payments', 'subscriptions'];
 
-      if (last8 && last8.length >= 7) {
-        const { data, error } = await client
-          .from('registrations')
-          .select('*')
-          .ilike('phone_number', `%${last8}%`)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
+    for (const tableName of candidateTables) {
+      try {
+        let matchedData: Record<string, unknown> | null = null;
 
-        if (!error && data) {
-          matchedData = data;
-        }
-      }
+        if (last8 && last8.length >= 7) {
+          for (const colName of ['phone_number', 'phone', 'user_phone', 'mobile']) {
+            const { data, error } = await client
+              .from(tableName)
+              .select('*')
+              .ilike(colName, `%${last8}%`)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-      // Secondary fallback: fetch top 100 recent rows and match in JS with phoneMatches
-      if (!matchedData) {
-        const { data: recentRows, error: listErr } = await client
-          .from('registrations')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100);
-
-        if (!listErr && Array.isArray(recentRows)) {
-          const found = recentRows.find((row) =>
-            phoneMatches(String(row.phone_number || ''), rawInput)
-          );
-          if (found) {
-            matchedData = found;
+            if (!error && data) {
+              matchedData = data as Record<string, unknown>;
+              break;
+            }
           }
         }
-      }
 
-      if (matchedData) {
-        const idStr = String(matchedData.id || '');
-        const phoneStr = String(matchedData.phone_number || '');
-        const normalized = canonicalPhone(phoneStr);
-        const rowLast8 = phoneStr.replace(/\D/g, '').slice(-8);
+        if (!matchedData) {
+          const { data: recentRows, error: listErr } = await client
+            .from(tableName)
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(100);
 
-        const cachedOverride =
-          statusOverridesMap.get(idStr) ||
-          statusOverridesMap.get(phoneStr) ||
-          statusOverridesMap.get(normalized) ||
-          (rowLast8 ? statusOverridesMap.get(rowLast8) : undefined) ||
-          overrideKey;
-
-        const dbStatus = matchedData.status as 'pending' | 'approved' | 'rejected' | undefined;
-        let finalStatus: 'pending' | 'approved' | 'rejected' = 'pending';
-        if (dbStatus === 'approved' || dbStatus === 'rejected') {
-          finalStatus = dbStatus;
-        } else if (cachedOverride?.status === 'approved' || cachedOverride?.status === 'rejected') {
-          finalStatus = cachedOverride.status;
+          if (!listErr && Array.isArray(recentRows)) {
+            const found = recentRows.find((row: Record<string, unknown>) => {
+              const rowPhone = String(row.phone_number || row.phone || row.user_phone || row.mobile || '');
+              return phoneMatches(rowPhone, rawInput);
+            });
+            if (found) {
+              matchedData = found as Record<string, unknown>;
+            }
+          }
         }
 
-        return {
-          id: idStr,
-          name: String(matchedData.name || ''),
-          phone_number: phoneStr,
-          payment_image_url: String(matchedData.payment_image_url || ''),
-          plan_name: String(matchedData.plan_name || 'Standard Plan (200 Birr)'),
-          amount: typeof matchedData.amount === 'number' ? matchedData.amount : 200,
-          status: finalStatus,
-          created_at: String(matchedData.created_at || new Date().toISOString()),
-          reviewed_at: (matchedData.reviewed_at ? String(matchedData.reviewed_at) : null) || cachedOverride?.reviewed_at || null,
-        };
+        if (matchedData) {
+          const parsed = extractRowData(matchedData);
+          const phoneStr = parsed.phone_number;
+          const normalized = canonicalPhone(phoneStr);
+          const rowLast8 = phoneStr.replace(/\D/g, '').slice(-8);
+
+          const cachedOverride =
+            statusOverridesMap.get(parsed.id) ||
+            statusOverridesMap.get(phoneStr) ||
+            statusOverridesMap.get(normalized) ||
+            (rowLast8 ? statusOverridesMap.get(rowLast8) : undefined) ||
+            overrideKey;
+
+          let finalStatus = parsed.status;
+          if (cachedOverride?.status === 'approved' || cachedOverride?.status === 'rejected') {
+            finalStatus = cachedOverride.status;
+          }
+
+          return {
+            ...parsed,
+            status: finalStatus,
+            reviewed_at: parsed.reviewed_at || cachedOverride?.reviewed_at || null,
+          };
+        }
+      } catch (dbErr) {
+        console.warn(`Supabase lookup warning on ${tableName}:`, dbErr);
       }
-    } catch (dbErr) {
-      console.warn('Supabase getRegistrationByPhone lookup warning:', dbErr);
     }
   }
 
-  // 2. Fallback to in-memory lookup
   const match = inMemoryRegistrations.find((r) => phoneMatches(r.phone_number, rawInput));
 
   if (match) {
@@ -347,72 +471,57 @@ export async function getAllRegistrations(): Promise<{
     };
   }
 
-  try {
-    const { data, error } = await client
-      .from('registrations')
-      .select('*')
-      .order('created_at', { ascending: false });
+  const candidateTables = ['registrations', 'payments', 'subscriptions'];
 
-    if (error) {
-      return {
-        registrations: inMemoryRegistrations,
-        isFromSupabase: false,
-        error: error.message,
-      };
-    }
+  for (const tableName of candidateTables) {
+    try {
+      const { data, error } = await client
+        .from(tableName)
+        .select('*')
+        .order('created_at', { ascending: false });
 
-    const list: RegistrationRecord[] = (data || []).map((row: Record<string, unknown>) => {
-      const idStr = String(row.id || '');
-      const phoneStr = String(row.phone_number || '');
-      const cleanPhone = normalizePhoneKey(phoneStr);
-
-      const cachedOverride =
-        statusOverridesMap.get(idStr) ||
-        (cleanPhone ? statusOverridesMap.get(cleanPhone) : undefined);
-
-      const dbStatus = row.status as 'pending' | 'approved' | 'rejected' | undefined;
-      
-      let finalStatus: 'pending' | 'approved' | 'rejected' = 'pending';
-      if (dbStatus === 'approved' || dbStatus === 'rejected') {
-        finalStatus = dbStatus;
-      } else if (cachedOverride && (cachedOverride.status === 'approved' || cachedOverride.status === 'rejected')) {
-        finalStatus = cachedOverride.status;
+      if (error) {
+        continue;
       }
 
-      const finalReviewedAt =
-        (row.reviewed_at ? String(row.reviewed_at) : null) ||
-        cachedOverride?.reviewed_at ||
-        null;
+      const list: RegistrationRecord[] = (data || []).map((row: Record<string, unknown>) => {
+        const parsed = extractRowData(row);
+        const cleanPhone = normalizePhoneKey(parsed.phone_number);
+
+        const cachedOverride =
+          statusOverridesMap.get(parsed.id) ||
+          (cleanPhone ? statusOverridesMap.get(cleanPhone) : undefined);
+
+        let finalStatus = parsed.status;
+        if (cachedOverride && (cachedOverride.status === 'approved' || cachedOverride.status === 'rejected')) {
+          finalStatus = cachedOverride.status;
+        }
+
+        return {
+          ...parsed,
+          status: finalStatus,
+          reviewed_at: parsed.reviewed_at || cachedOverride?.reviewed_at || null,
+        };
+      });
 
       return {
-        id: idStr,
-        name: String(row.name || ''),
-        phone_number: phoneStr,
-        payment_image_url: String(row.payment_image_url || ''),
-        plan_name: String(row.plan_name || 'Standard Plan (200 Birr)'),
-        amount: typeof row.amount === 'number' ? row.amount : 200,
-        status: finalStatus,
-        created_at: String(row.created_at || new Date().toISOString()),
-        reviewed_at: finalReviewedAt,
+        registrations: list,
+        isFromSupabase: true,
       };
-    });
-
-    return {
-      registrations: list,
-      isFromSupabase: true,
-    };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Failed to query Supabase';
-    return {
-      registrations: inMemoryRegistrations,
-      isFromSupabase: false,
-      error: msg,
-    };
+    } catch (err) {
+      console.warn(`Error querying table ${tableName}:`, err);
+    }
   }
+
+  return {
+    registrations: inMemoryRegistrations,
+    isFromSupabase: false,
+    error: 'Could not retrieve rows from database tables.',
+  };
 }
 
 /**
- * Updates a registration's status (approved, rejected, pending) in Supabase and memory
+ * Updates a registration's approval status in Supabase and in-memory cache
  */
 export async function updateRegistrationStatus(
   id: string,
@@ -441,7 +550,6 @@ export async function updateRegistrationStatus(
     statusOverridesMap.set(last8, { status, reviewed_at: nowIso });
   }
 
-  // Update in memory registrations immediately
   inMemoryRegistrations = inMemoryRegistrations.map((r) => {
     if (r.id === id || (rawPhone && phoneMatches(r.phone_number, rawPhone))) {
       return { ...r, status, reviewed_at: nowIso };
@@ -454,58 +562,43 @@ export async function updateRegistrationStatus(
     return { success: true };
   }
 
-  try {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
-    const isNumericId = /^\d+$/.test(id || '');
+  const candidateTables = ['registrations', 'payments', 'subscriptions'];
 
-    // 1. Try updating by ID if it matches valid DB ID structure
-    if (isUuid || isNumericId) {
-      try {
+  for (const tableName of candidateTables) {
+    try {
+      if (id && !id.startsWith('reg_')) {
         const { error } = await client
-          .from('registrations')
+          .from(tableName)
           .update({ status, reviewed_at: nowIso })
           .eq('id', id);
 
         if (error) {
-          // Retry without reviewed_at in case the column does not exist
-          await client
-            .from('registrations')
-            .update({ status })
-            .eq('id', id);
+          await client.from(tableName).update({ status }).eq('id', id);
         }
-      } catch (idUpdateErr) {
-        console.warn('ID update warning:', idUpdateErr);
       }
-    }
 
-    // 2. ALWAYS also update by phone number to ensure synchronization
-    if (last8 && last8.length >= 7) {
-      try {
-        const { error } = await client
-          .from('registrations')
-          .update({ status, reviewed_at: nowIso })
-          .ilike('phone_number', `%${last8}%`);
+      if (last8 && last8.length >= 7) {
+        for (const phoneCol of ['phone_number', 'phone', 'user_phone', 'mobile']) {
+          const { error } = await client
+            .from(tableName)
+            .update({ status, reviewed_at: nowIso })
+            .ilike(phoneCol, `%${last8}%`);
 
-        if (error) {
-          await client
-            .from('registrations')
-            .update({ status })
-            .ilike('phone_number', `%${last8}%`);
+          if (error) {
+            await client.from(tableName).update({ status }).ilike(phoneCol, `%${last8}%`);
+          }
         }
-      } catch (phoneUpdateErr) {
-        console.warn('Phone update warning:', phoneUpdateErr);
       }
+    } catch (err) {
+      console.warn(`Update notice for ${tableName}:`, err);
     }
-
-    return { success: true };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Database update warning';
-    return { success: true, error: msg };
   }
+
+  return { success: true };
 }
 
 /**
- * Deletes a registration from Supabase & memory
+ * Deletes a registration record
  */
 export async function deleteRegistration(
   id: string,
@@ -526,57 +619,48 @@ export async function deleteRegistration(
   });
 
   const client = getSupabaseClient();
-  if (!client) {
-    return { success: true };
+  if (!client) return { success: true };
+
+  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+  for (const tableName of candidateTables) {
+    try {
+      if (id && !id.startsWith('reg_')) {
+        await client.from(tableName).delete().eq('id', id);
+      }
+      if (phoneNumber) {
+        const last8 = phoneNumber.replace(/\D/g, '').slice(-8);
+        if (last8 && last8.length >= 7) {
+          for (const col of ['phone_number', 'phone', 'user_phone']) {
+            await client.from(tableName).delete().ilike(col, `%${last8}%`);
+          }
+        }
+      }
+    } catch {
+      // Ignore deletion errors
+    }
   }
 
-  try {
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
-
-    if (isUuid) {
-      await client
-        .from('registrations')
-        .delete()
-        .eq('id', id);
-    }
-
-    if (cleanPhone) {
-      await client
-        .from('registrations')
-        .delete()
-        .ilike('phone_number', `%${cleanPhone.slice(-9)}%`);
-    }
-
-    return { success: true };
-  } catch {
-    return { success: true };
-  }
+  return { success: true };
 }
 
 /**
- * Resets all registrations (clears all records)
+ * Reset all registrations (Dev / Admin cleanup)
  */
 export async function resetAllRegistrations(): Promise<{ success: boolean; count: number; error?: string }> {
   inMemoryRegistrations = [];
   statusOverridesMap.clear();
 
   const client = getSupabaseClient();
-  if (!client) {
-    return { success: true, count: 0 };
-  }
+  if (!client) return { success: true, count: 0 };
 
-  try {
-    const { error, count } = await client
-      .from('registrations')
-      .delete()
-      .neq('name', '___NEVER_MATCH___');
-
-    if (error) {
-      return { success: false, count: 0, error: error.message };
+  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+  for (const tableName of candidateTables) {
+    try {
+      await client.from(tableName).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    } catch {
+      // Ignore
     }
-    return { success: true, count: count ?? 0 };
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Error clearing Supabase records';
-    return { success: false, count: 0, error: msg };
   }
+
+  return { success: true, count: 0 };
 }

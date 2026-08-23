@@ -128,8 +128,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Upload Payment Image to Cloudinary (Server-Side)
-    const { secure_url: cloudinaryImageUrl, uploadedToCloudinary } =
-      await uploadPaymentImageToCloudinary(buffer, mimeType);
+    const {
+      secure_url: cloudinaryImageUrl,
+      uploadedToCloudinary,
+      error: uploadError,
+      cloudName,
+    } = await uploadPaymentImageToCloudinary(buffer, mimeType);
 
     // 5. Store in Supabase
     const { record, savedToSupabase, error: dbError } = await saveRegistrationToSupabase({
@@ -149,6 +153,8 @@ export async function POST(req: NextRequest) {
           : 'Registration processed locally.',
         savedToSupabase,
         uploadedToCloudinary,
+        cloudinaryError: uploadError || null,
+        cloudName: cloudName || null,
         dbError: dbError || null,
         registration: record,
       },

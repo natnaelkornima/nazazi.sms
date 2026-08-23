@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       connection: {
         isSupabaseConfigured: isSupabaseConfigured(),
         isFromSupabase,
-        isCloudinaryConfigured,
+        isCloudinaryConfigured: isCloudinaryConfigured(),
         dbError: error || null,
       },
     });
