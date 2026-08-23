@@ -46,6 +46,8 @@ import {
   X,
   Square,
   ListFilter,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface SmsLogItem {
@@ -142,6 +144,10 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   // Reset Modal
   const [showResetModal, setShowResetModal] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+
+  // Export Loading States
+  const [isExportingCsv, setIsExportingCsv] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   // SMS Dispatcher State
   const [targetType, setTargetType] = useState<'all_approved' | 'single_member'>('all_approved');
@@ -360,6 +366,237 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
       error('Batch Delete Failed', 'Could not delete all selected items.');
     } finally {
       setIsBatchDeleting(false);
+    }
+  };
+
+  // Export to CSV with full registration information
+  const exportToCSV = () => {
+    if (filteredSubmissions.length === 0) {
+      info('No Data to Export', 'There are no registered users matching your filter.');
+      return;
+    }
+
+    setIsExportingCsv(true);
+    try {
+      const headers = [
+        '#',
+        'Registration ID',
+        'Full Name',
+        'Phone Number',
+        'Email Address',
+        'Plan Tier',
+        'Amount (ETB)',
+        'Currency',
+        'Payer Name',
+        'Transaction ID',
+        'Status',
+        'Registration Date',
+        'Registration Time',
+        'Receipt Screenshot URL',
+        'Notes',
+      ];
+
+      const rows = filteredSubmissions.map((sub, index) => {
+        const subDate = new Date(sub.submittedAt);
+        const formattedDate = !isNaN(subDate.getTime()) ? subDate.toLocaleDateString() : 'N/A';
+        const formattedTime = !isNaN(subDate.getTime()) ? subDate.toLocaleTimeString() : 'N/A';
+
+        return [
+          index + 1,
+          `"${(sub.id || '').replace(/"/g, '""')}"`,
+          `"${(sub.userName || '').replace(/"/g, '""')}"`,
+          `"${(sub.userPhone || '').replace(/"/g, '""')}"`,
+          `"${(sub.userEmail || '').replace(/"/g, '""')}"`,
+          `"${(sub.planName || '').replace(/"/g, '""')}"`,
+          sub.amount || 0,
+          `"${(sub.currency || 'ETB').replace(/"/g, '""')}"`,
+          `"${(sub.payerName || '').replace(/"/g, '""')}"`,
+          `"${(sub.transactionId || '').replace(/"/g, '""')}"`,
+          `"${(sub.status || '').toUpperCase()}"`,
+          `"${formattedDate}"`,
+          `"${formattedTime}"`,
+          `"${(sub.screenshotUrl || '').replace(/"/g, '""')}"`,
+          `"${(sub.notes || '').replace(/"/g, '""')}"`,
+        ];
+      });
+
+      // UTF-8 BOM for spreadsheet application compatibility with Amharic / Ethiopian names
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      const dateSlug = new Date().toISOString().split('T')[0];
+      link.setAttribute('download', `nazazi_registered_users_${statusFilter}_${dateSlug}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      success('CSV Exported', `Successfully exported ${filteredSubmissions.length} user record(s) to CSV.`);
+    } catch (err) {
+      console.error('CSV Export Error:', err);
+      error('Export Error', 'Failed to generate CSV export file.');
+    } finally {
+      setIsExportingCsv(false);
+    }
+  };
+
+  // Export to PDF with professional summary report and table
+  const exportToPDF = async () => {
+    if (filteredSubmissions.length === 0) {
+      info('No Data to Export', 'There are no registered users matching your filter.');
+      return;
+    }
+
+    setIsExportingPdf(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Header Banner
+      doc.setFillColor(24, 24, 27); // #18181b
+      doc.rect(0, 0, 210, 24, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('NAZAZI SPIRITUAL SMS SERVICE', 14, 11);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(212, 212, 216);
+      doc.text('Registered Users Master Report & Subscriptions List', 14, 18);
+
+      // Meta details block
+      const exportDate = new Date().toLocaleString();
+      const totalAmount = filteredSubmissions.reduce((sum, s) => sum + (s.amount || 0), 0);
+      const approvedTotal = filteredSubmissions.filter((s) => s.status === 'approved').length;
+      const pendingTotal = filteredSubmissions.filter((s) => s.status === 'pending').length;
+      const rejectedTotal = filteredSubmissions.filter((s) => s.status === 'rejected').length;
+
+      doc.setTextColor(60, 60, 65);
+      doc.setFontSize(8);
+      doc.text(`Generated: ${exportDate}`, 14, 30);
+      doc.text(`Status Filter: ${statusFilter.toUpperCase()}`, 14, 34.5);
+      doc.text(
+        `Total Records: ${filteredSubmissions.length} (${approvedTotal} Approved, ${pendingTotal} Pending, ${rejectedTotal} Rejected)`,
+        14,
+        39
+      );
+
+      doc.text(`Total Subscription Value: ${totalAmount.toLocaleString()} ETB`, 122, 30);
+      doc.text(`Admin System: Nazazi SMS Portal`, 122, 34.5);
+
+      // Subtle Divider
+      doc.setDrawColor(225, 225, 230);
+      doc.line(14, 43, 196, 43);
+
+      const tableData = filteredSubmissions.map((sub, idx) => {
+        const subDate = new Date(sub.submittedAt);
+        const dateStr = !isNaN(subDate.getTime()) ? subDate.toLocaleDateString() : 'N/A';
+        return [
+          idx + 1,
+          sub.userName || 'N/A',
+          sub.userPhone || 'N/A',
+          sub.planName || '1 Month Access',
+          `${Number(sub.amount || 0).toLocaleString()} ETB`,
+          (sub.status || 'PENDING').toUpperCase(),
+          dateStr,
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 46,
+        head: [['#', 'Member Name', 'Phone Number', 'Plan Tier', 'Amount', 'Status', 'Date']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [39, 39, 42],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+          halign: 'left',
+        },
+        styles: {
+          fontSize: 7.5,
+          cellPadding: 2.5,
+          valign: 'middle',
+          overflow: 'linebreak',
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          1: { cellWidth: 42, fontStyle: 'bold' },
+          2: { cellWidth: 32 },
+          3: { cellWidth: 38 },
+          4: { cellWidth: 22, halign: 'right' },
+          5: { cellWidth: 22, halign: 'center' },
+          6: { cellWidth: 22, halign: 'center' },
+        },
+        alternateRowStyles: {
+          fillColor: [248, 248, 250],
+        },
+        didParseCell: (data) => {
+          if (data.section === 'body' && data.column.index === 5) {
+            const status = String(data.cell.raw).toUpperCase();
+            if (status === 'APPROVED') {
+              data.cell.styles.textColor = [16, 149, 106];
+              data.cell.styles.fontStyle = 'bold';
+            } else if (status === 'PENDING') {
+              data.cell.styles.textColor = [217, 119, 6];
+              data.cell.styles.fontStyle = 'bold';
+            } else if (status === 'REJECTED') {
+              data.cell.styles.textColor = [225, 29, 72];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        },
+        foot: [
+          [
+            '',
+            `Total: ${filteredSubmissions.length} user(s)`,
+            '',
+            '',
+            `${totalAmount.toLocaleString()} ETB`,
+            '',
+            '',
+          ],
+        ],
+        footStyles: {
+          fillColor: [240, 240, 243],
+          textColor: [24, 24, 27],
+          fontStyle: 'bold',
+          fontSize: 8,
+        },
+      });
+
+      // Add footer to each page
+      const totalDocPages = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalDocPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(140, 140, 145);
+        doc.text(
+          `Nazazi Spiritual Services | Confidential Admin Report | Page ${i} of ${totalDocPages}`,
+          14,
+          290
+        );
+      }
+
+      const dateSlug = new Date().toISOString().split('T')[0];
+      doc.save(`nazazi_registered_users_${statusFilter}_${dateSlug}.pdf`);
+      success('PDF Exported', `Generated PDF report with ${filteredSubmissions.length} user record(s).`);
+    } catch (err) {
+      console.error('PDF Export Error:', err);
+      error('Export Error', 'Failed to generate PDF document.');
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -786,6 +1023,32 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              {/* Export to CSV Button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exportToCSV}
+                isLoading={isExportingCsv}
+                leftIcon={<FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
+                className="text-xs py-1.5 h-8 font-semibold shadow-2xs"
+                title="Export currently displayed list as CSV"
+              >
+                Export to CSV
+              </Button>
+
+              {/* Export to PDF Button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={exportToPDF}
+                isLoading={isExportingPdf}
+                leftIcon={<FileText className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />}
+                className="text-xs py-1.5 h-8 font-semibold shadow-2xs"
+                title="Export currently displayed list as PDF with all details"
+              >
+                Export to PDF
+              </Button>
+
               {/* Toggle Select Mode Button */}
               {filteredSubmissions.length > 0 && (
                 <button
@@ -800,7 +1063,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                       setIsSelectionMode(true);
                     }
                   }}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
                     isSelectionMode || selectedIds.length > 0
                       ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-xs'
                       : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
