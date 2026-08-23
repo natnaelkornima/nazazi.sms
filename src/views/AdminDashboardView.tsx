@@ -41,8 +41,11 @@ import {
   Lock,
   Settings,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
   X,
+  Square,
+  ListFilter,
 } from 'lucide-react';
 
 interface SmsLogItem {
@@ -119,6 +122,13 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   const [paymentSearch, setPaymentSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [previewSubmission, setPreviewSubmission] = useState<PaymentSubmission | null>(null);
+
+  // Pagination for Registrations
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(20);
+
+  // Selection Mode (shows modern select boxes only when activated or when items are selected)
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
 
   // Single Item Delete Confirmation Modal
   const [itemToDelete, setItemToDelete] = useState<PaymentSubmission | null>(null);
@@ -213,6 +223,17 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
     return matchesSearch && matchesStatus;
   });
 
+  // Reset to page 1 if query or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [paymentSearch, statusFilter, pageSize]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredSubmissions.length / pageSize));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (validCurrentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filteredSubmissions.length);
+  const paginatedSubmissions = filteredSubmissions.slice(startIndex, endIndex);
+
   // Handle Send SMS to Approved Numbers
   const handleSendSms = (e: React.FormEvent) => {
     e.preventDefault();
@@ -289,15 +310,37 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   };
 
   const handleToggleSelect = (id: string) => {
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
+      if (next.length === 0) {
+        setIsSelectionMode(false);
+      } else {
+        setIsSelectionMode(true);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectPage = () => {
+    const pageIds = paginatedSubmissions.map((s) => s.id);
+    const allPageSelected = pageIds.every((id) => selectedIds.includes(id));
+    if (allPageSelected) {
+      const next = selectedIds.filter((id) => !pageIds.includes(id));
+      setSelectedIds(next);
+      if (next.length === 0) setIsSelectionMode(false);
+    } else {
+      setIsSelectionMode(true);
+      const combined = Array.from(new Set([...selectedIds, ...pageIds]));
+      setSelectedIds(combined);
+    }
   };
 
   const handleSelectAll = () => {
     if (selectedIds.length === filteredSubmissions.length && filteredSubmissions.length > 0) {
       setSelectedIds([]);
+      setIsSelectionMode(false);
     } else {
+      setIsSelectionMode(true);
       setSelectedIds(filteredSubmissions.map((s) => s.id));
     }
   };
@@ -731,8 +774,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             </div>
           </div>
 
-          {/* Search Input & Batch Action Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Search Input, Batch Selection & Pagination Controls Bar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div className="max-w-md w-full">
               <Input
                 placeholder="Search by member name, phone number (+251...), or plan..."
@@ -742,29 +785,61 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
               />
             </div>
 
-            {selectedIds.length > 0 && (
-              <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-1.5 px-3 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs">
-                <span className="font-bold text-zinc-800 dark:text-zinc-200 font-mono">
-                  {selectedIds.length} selected
-                </span>
-                <Button
-                  size="sm"
-                  variant="danger"
-                  onClick={() => setShowBatchDeleteModal(true)}
-                  leftIcon={<Trash2 className="w-3.5 h-3.5" />}
-                  className="text-xs py-1 h-7"
-                >
-                  Delete Selected
-                </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Toggle Select Mode Button */}
+              {filteredSubmissions.length > 0 && (
                 <button
                   type="button"
-                  onClick={() => setSelectedIds([])}
-                  className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 text-[11px] underline cursor-pointer ml-1"
+                  onClick={() => {
+                    if (isSelectionMode && selectedIds.length === 0) {
+                      setIsSelectionMode(false);
+                    } else if (isSelectionMode && selectedIds.length > 0) {
+                      setSelectedIds([]);
+                      setIsSelectionMode(false);
+                    } else {
+                      setIsSelectionMode(true);
+                    }
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                    isSelectionMode || selectedIds.length > 0
+                      ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-xs'
+                      : 'bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700 hover:border-zinc-300 dark:hover:border-zinc-600'
+                  }`}
+                  title="Toggle multi-item select mode"
                 >
-                  Clear
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>{isSelectionMode || selectedIds.length > 0 ? 'Selection Active' : 'Select'}</span>
                 </button>
-              </div>
-            )}
+              )}
+
+              {/* Active Selection Floating Pill */}
+              {selectedIds.length > 0 && (
+                <div className="flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800 p-1 px-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 text-xs">
+                  <span className="font-bold text-zinc-800 dark:text-zinc-200 font-mono">
+                    {selectedIds.length} chosen
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="danger"
+                    onClick={() => setShowBatchDeleteModal(true)}
+                    leftIcon={<Trash2 className="w-3 h-3" />}
+                    className="text-xs py-0.5 h-6.5 px-2"
+                  >
+                    Delete Selected
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedIds([]);
+                      setIsSelectionMode(false);
+                    }}
+                    className="text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 text-[11px] underline cursor-pointer"
+                  >
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Registrations Table */}
@@ -787,207 +862,312 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
               </Button>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-500 font-semibold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
-                  <tr>
-                    <th className="py-3 px-3 pl-4 w-10 text-center">
-                      <input
-                        type="checkbox"
-                        checked={
-                          filteredSubmissions.length > 0 &&
-                          selectedIds.length === filteredSubmissions.length
-                        }
-                        onChange={handleSelectAll}
-                        className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 accent-zinc-900 dark:accent-zinc-100 cursor-pointer"
-                        title="Select all"
-                      />
-                    </th>
-                    <th className="py-3 px-2 w-12 text-center text-[11px] font-mono text-zinc-400">#</th>
-                    <th className="py-3 px-3">Member Name & Phone</th>
-                    <th className="py-3 px-3">Plan / Amount</th>
-                    <th className="py-3 px-3">Receipt Image</th>
-                    <th className="py-3 px-3">Date</th>
-                    <th className="py-3 px-3">Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
-                  {filteredSubmissions.map((sub, index) => (
-                    <tr
-                      key={sub.id}
-                      className={`hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors ${
-                        selectedIds.includes(sub.id) ? 'bg-zinc-50/90 dark:bg-zinc-800/60' : ''
-                      }`}
-                    >
-                      <td className="py-3 px-3 pl-4 w-10 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(sub.id)}
-                          onChange={() => handleToggleSelect(sub.id)}
-                          className="w-4 h-4 rounded border-zinc-300 dark:border-zinc-700 accent-zinc-900 dark:accent-zinc-100 cursor-pointer"
-                        />
-                      </td>
-                      <td className="py-3 px-2 w-12 text-center text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500">
-                        {index + 1}
-                      </td>
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-zinc-900 dark:text-zinc-100">{sub.userName}</p>
-                          <p className="text-[11px] font-mono text-zinc-700 dark:text-zinc-300 font-bold flex items-center gap-1">
-                            <Smartphone className="w-3 h-3 text-zinc-400" /> {sub.userPhone}
-                          </p>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        <div className="space-y-1.5">
-                          <div className="relative inline-flex items-center">
-                            <select
-                              value={sub.amount >= 1000 ? '1000' : sub.amount >= 600 ? '600' : '200'}
-                              onChange={async (e) => {
-                                const val = Number(e.target.value);
-                                const newPlanName =
-                                  val === 1000
-                                    ? '6 Months Access (1,000 Birr)'
-                                    : val === 600
-                                    ? '3 Months Access (600 Birr)'
-                                    : '1 Month Access (200 Birr)';
-                                await updatePaymentPlan(sub.id, newPlanName, val, sub.userPhone);
-                                success('Plan Updated', `Set to ${val} ETB (${val === 1000 ? '6 Months' : val === 600 ? '3 Months' : '1 Month'}) for ${sub.userName}`);
-                              }}
-                              className={`text-[10px] font-extrabold uppercase py-1 pl-2 pr-6 rounded-md border appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors ${
-                                sub.amount >= 1000 || sub.planName.toLowerCase().includes('6')
-                                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                                  : sub.amount >= 600 || sub.planName.toLowerCase().includes('3')
-                                  ? 'bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 border-purple-300 dark:border-purple-800'
-                                  : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700'
-                              }`}
-                              title="Click to adjust plan tier & amount"
-                            >
-                              <option value="200" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
-                                1 Mo • 200 ETB
-                              </option>
-                              <option value="600" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
-                                3 Mo • 600 ETB
-                              </option>
-                              <option value="1000" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
-                                6 Mo • 1,000 ETB
-                              </option>
-                            </select>
-                            <ChevronDown className="w-3 h-3 absolute right-1.5 pointer-events-none opacity-60" />
-                          </div>
-                          <p className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100">
-                            {Number(sub.amount).toLocaleString()} ETB
-                          </p>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-3">
-                        {sub.screenshotUrl ? (
-                          <div
-                            onClick={() => setPreviewSubmission(sub)}
-                            className="relative h-11 w-18 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-950 cursor-pointer group shadow-xs"
-                            title="Click to view full receipt image"
-                          >
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={sub.screenshotUrl}
-                              alt="Payment Screenshot"
-                              referrerPolicy="no-referrer"
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200 opacity-90"
-                            />
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Eye className="w-4 h-4 text-white" />
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-zinc-400 text-[11px] italic">No image</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-3 text-zinc-500 font-mono text-[11px]">
-                        {new Date(sub.submittedAt).toLocaleDateString()}
-                      </td>
-
-                      <td className="py-3 px-3">
-                        {sub.status === 'pending' && <Badge variant="amber" dot>Pending</Badge>}
-                        {sub.status === 'approved' && <Badge variant="zinc" dot>Approved</Badge>}
-                        {sub.status === 'rejected' && <Badge variant="danger">Rejected</Badge>}
-                      </td>
-
-                      <td className="py-3 px-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                          {sub.status === 'pending' && (
-                            <div className="inline-flex items-center bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  approvePayment(sub.id);
-                                  success('Approved!', `Activated SMS subscription for ${sub.userPhone}`);
-                                }}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 transition-all cursor-pointer"
-                                title="Approve and activate"
-                              >
-                                <Check className="w-3.5 h-3.5" /> Approve
-                              </button>
-                              <div className="w-[1px] h-3.5 bg-zinc-300 dark:bg-zinc-700 mx-0.5" />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  rejectPayment(sub.id);
-                                  info('Rejected', `Marked ${sub.userPhone} as rejected`);
-                                }}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-600 transition-all cursor-pointer"
-                                title="Reject registration"
-                              >
-                                <X className="w-3.5 h-3.5" /> Reject
-                              </button>
-                            </div>
-                          )}
-
-                          {sub.status === 'approved' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setSelectedPhone(sub.userPhone);
-                                setActiveTab('send_sms');
-                                setTargetType('single_member');
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
-                            >
-                              <Send className="w-3 h-3" /> Send SMS
-                            </button>
-                          )}
-
-                          {sub.status === 'rejected' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                approvePayment(sub.id);
-                                success('Approved', `Status updated to active for ${sub.userPhone}`);
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
-                            >
-                              <Check className="w-3 h-3" /> Re-Approve
-                            </button>
-                          )}
-
+            <div className="space-y-3">
+              <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-zinc-50 dark:bg-zinc-900/80 text-zinc-500 font-semibold uppercase tracking-wider border-b border-zinc-200 dark:border-zinc-800">
+                    <tr>
+                      {/* Selection Column Header - shown when Selection Mode is on or items are selected */}
+                      {(isSelectionMode || selectedIds.length > 0) && (
+                        <th className="py-3 px-3 pl-4 w-10 text-center transition-all animate-fadeIn">
                           <button
                             type="button"
-                            id={`delete-btn-${sub.id}`}
-                            onClick={() => setItemToDelete(sub)}
-                            className="p-1.5 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer ml-1"
-                            title="Delete this record"
+                            onClick={handleSelectPage}
+                            className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer border ${
+                              paginatedSubmissions.length > 0 &&
+                              paginatedSubmissions.every((s) => selectedIds.includes(s.id))
+                                ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-2xs'
+                                : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800 hover:border-zinc-400'
+                            }`}
+                            title="Select / Deselect all on this page"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            {paginatedSubmissions.length > 0 &&
+                            paginatedSubmissions.every((s) => selectedIds.includes(s.id)) ? (
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            ) : paginatedSubmissions.some((s) => selectedIds.includes(s.id)) ? (
+                              <div className="w-2 h-0.5 bg-zinc-900 dark:bg-zinc-100 rounded-full" />
+                            ) : null}
                           </button>
-                        </div>
-                      </td>
+                        </th>
+                      )}
+                      <th className={`py-3 px-3 w-12 text-center text-[11px] font-mono text-zinc-400 ${!(isSelectionMode || selectedIds.length > 0) ? 'pl-4' : ''}`}>#</th>
+                      <th className="py-3 px-3">Member Name & Phone</th>
+                      <th className="py-3 px-3">Plan / Amount</th>
+                      <th className="py-3 px-3">Receipt Image</th>
+                      <th className="py-3 px-3">Date</th>
+                      <th className="py-3 px-3">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/80">
+                    {paginatedSubmissions.map((sub, pageIndex) => {
+                      const absoluteIndex = startIndex + pageIndex + 1;
+                      const isSelected = selectedIds.includes(sub.id);
+
+                      return (
+                        <tr
+                          key={sub.id}
+                          onClick={(e) => {
+                            // If in selection mode and not clicking an interactive control, toggle row selection
+                            const target = e.target as HTMLElement;
+                            if (
+                              isSelectionMode &&
+                              !target.closest('button') &&
+                              !target.closest('select') &&
+                              !target.closest('a') &&
+                              !target.closest('img')
+                            ) {
+                              handleToggleSelect(sub.id);
+                            }
+                          }}
+                          className={`hover:bg-zinc-50/80 dark:hover:bg-zinc-800/40 transition-colors ${
+                            isSelected
+                              ? 'bg-zinc-100/80 dark:bg-zinc-800/70'
+                              : ''
+                          } ${isSelectionMode ? 'cursor-pointer select-none' : ''}`}
+                        >
+                          {/* Modern Select Checkbox Cell */}
+                          {(isSelectionMode || selectedIds.length > 0) && (
+                            <td className="py-3 px-3 pl-4 w-10 text-center">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleSelect(sub.id);
+                                }}
+                                className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer border ${
+                                  isSelected
+                                    ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-2xs'
+                                    : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800/80 hover:border-zinc-400'
+                                }`}
+                                title={isSelected ? 'Deselect member' : 'Select member'}
+                              >
+                                {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                              </button>
+                            </td>
+                          )}
+
+                          {/* Index Number */}
+                          <td className={`py-3 px-3 w-12 text-center text-xs font-mono font-bold text-zinc-400 dark:text-zinc-500 ${!(isSelectionMode || selectedIds.length > 0) ? 'pl-4' : ''}`}>
+                            {absoluteIndex}
+                          </td>
+
+                          {/* Member Name & Phone */}
+                          <td className="py-3 px-3">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-zinc-900 dark:text-zinc-100">{sub.userName}</p>
+                              <p className="text-[11px] font-mono text-zinc-700 dark:text-zinc-300 font-bold flex items-center gap-1">
+                                <Smartphone className="w-3 h-3 text-zinc-400" /> {sub.userPhone}
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Plan / Amount */}
+                          <td className="py-3 px-3">
+                            <div className="space-y-1.5">
+                              <div className="relative inline-flex items-center">
+                                <select
+                                  value={sub.amount >= 1000 ? '1000' : sub.amount >= 600 ? '600' : '200'}
+                                  onChange={async (e) => {
+                                    const val = Number(e.target.value);
+                                    const newPlanName =
+                                      val === 1000
+                                        ? '6 Months Access (1,000 Birr)'
+                                        : val === 600
+                                        ? '3 Months Access (600 Birr)'
+                                        : '1 Month Access (200 Birr)';
+                                    await updatePaymentPlan(sub.id, newPlanName, val, sub.userPhone);
+                                    success('Plan Updated', `Set to ${val} ETB (${val === 1000 ? '6 Months' : val === 600 ? '3 Months' : '1 Month'}) for ${sub.userName}`);
+                                  }}
+                                  className={`text-[10px] font-extrabold uppercase py-1 pl-2 pr-6 rounded-md border appearance-none cursor-pointer focus:outline-none focus:ring-1 focus:ring-amber-500 transition-colors ${
+                                    sub.amount >= 1000 || sub.planName.toLowerCase().includes('6')
+                                      ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                                      : sub.amount >= 600 || sub.planName.toLowerCase().includes('3')
+                                      ? 'bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                                      : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700'
+                                  }`}
+                                  title="Click to adjust plan tier & amount"
+                                >
+                                  <option value="200" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                    1 Mo • 200 ETB
+                                  </option>
+                                  <option value="600" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                    3 Mo • 600 ETB
+                                  </option>
+                                  <option value="1000" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                    6 Mo • 1,000 ETB
+                                  </option>
+                                </select>
+                                <ChevronDown className="w-3 h-3 absolute right-1.5 pointer-events-none opacity-60" />
+                              </div>
+                              <p className="text-xs font-mono font-bold text-zinc-900 dark:text-zinc-100">
+                                {Number(sub.amount).toLocaleString()} ETB
+                              </p>
+                            </div>
+                          </td>
+
+                          {/* Receipt Image */}
+                          <td className="py-3 px-3">
+                            {sub.screenshotUrl ? (
+                              <div
+                                onClick={() => setPreviewSubmission(sub)}
+                                className="relative h-11 w-18 rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 bg-zinc-950 cursor-pointer group shadow-xs"
+                                title="Click to view full receipt image"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={sub.screenshotUrl}
+                                  alt="Payment Screenshot"
+                                  referrerPolicy="no-referrer"
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200 opacity-90"
+                                />
+                                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <Eye className="w-4 h-4 text-white" />
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-zinc-400 text-[11px] italic">No image</span>
+                            )}
+                          </td>
+
+                          {/* Date */}
+                          <td className="py-3 px-3 text-zinc-500 font-mono text-[11px]">
+                            {new Date(sub.submittedAt).toLocaleDateString()}
+                          </td>
+
+                          {/* Status */}
+                          <td className="py-3 px-3">
+                            {sub.status === 'pending' && <Badge variant="amber" dot>Pending</Badge>}
+                            {sub.status === 'approved' && <Badge variant="zinc" dot>Approved</Badge>}
+                            {sub.status === 'rejected' && <Badge variant="danger">Rejected</Badge>}
+                          </td>
+
+                          {/* Actions */}
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                              {sub.status === 'pending' && (
+                                <div className="inline-flex items-center bg-zinc-100 dark:bg-zinc-800/80 p-0.5 rounded-lg border border-zinc-200/80 dark:border-zinc-700/80 shadow-2xs">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      approvePayment(sub.id);
+                                      success('Approved!', `Activated SMS subscription for ${sub.userPhone}`);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 transition-all cursor-pointer"
+                                    title="Approve and activate"
+                                  >
+                                    <Check className="w-3.5 h-3.5" /> Approve
+                                  </button>
+                                  <div className="w-[1px] h-3.5 bg-zinc-300 dark:bg-zinc-700 mx-0.5" />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      rejectPayment(sub.id);
+                                      info('Rejected', `Marked ${sub.userPhone} as rejected`);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-600 transition-all cursor-pointer"
+                                    title="Reject registration"
+                                  >
+                                    <X className="w-3.5 h-3.5" /> Reject
+                                  </button>
+                                </div>
+                              )}
+
+                              {sub.status === 'approved' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedPhone(sub.userPhone);
+                                    setActiveTab('send_sms');
+                                    setTargetType('single_member');
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
+                                >
+                                  <Send className="w-3 h-3" /> Send SMS
+                                </button>
+                              )}
+
+                              {sub.status === 'rejected' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    approvePayment(sub.id);
+                                    success('Approved', `Status updated to active for ${sub.userPhone}`);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
+                                >
+                                  <Check className="w-3 h-3" /> Re-Approve
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                id={`delete-btn-${sub.id}`}
+                                onClick={() => setItemToDelete(sub)}
+                                className="p-1.5 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer ml-1"
+                                title="Delete this record"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 20 Per Page Pagination Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 px-1 text-xs text-zinc-500">
+                <div className="flex items-center gap-3">
+                  <span className="font-mono">
+                    Showing <strong className="text-zinc-900 dark:text-zinc-100">{startIndex + 1}</strong>–
+                    <strong className="text-zinc-900 dark:text-zinc-100">{endIndex}</strong> of{' '}
+                    <strong className="text-zinc-900 dark:text-zinc-100">{filteredSubmissions.length}</strong> members
+                  </span>
+
+                  {/* Page Size Selector */}
+                  <div className="flex items-center gap-1.5 text-[11px]">
+                    <span>per page:</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => setPageSize(Number(e.target.value))}
+                      className="py-0.5 px-1.5 rounded-md border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 font-bold focus:outline-none cursor-pointer"
+                    >
+                      <option value="10">10</option>
+                      <option value="20">20</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Page Navigation Buttons (Previous, Next, and Page Indicator) */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={validCurrentPage <= 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                  </button>
+
+                  <span className="px-3 py-1.5 font-mono font-bold text-zinc-700 dark:text-zinc-300 bg-zinc-100 dark:bg-zinc-800/80 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    {validCurrentPage} / {totalPages}
+                  </span>
+
+                  <button
+                    type="button"
+                    disabled={validCurrentPage >= totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer shadow-2xs"
+                  >
+                    Next <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </Card>
