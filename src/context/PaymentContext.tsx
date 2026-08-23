@@ -182,10 +182,21 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
               return item;
             });
 
+            // Also preserve any recently added local submissions not yet present in server response
+            const existingIds = new Set(cleanList.map((c) => c.id));
+            const existingPhones = new Set(cleanList.map((c) => c.userPhone.replace(/\D/g, '')).filter(Boolean));
+
+            const additionalLocal = prev.filter((p) => {
+              const pPhone = p.userPhone.replace(/\D/g, '');
+              return !existingIds.has(p.id) && (!pPhone || !existingPhones.has(pPhone));
+            });
+
+            const finalList = [...additionalLocal, ...merged];
+
             if (typeof window !== 'undefined') {
-              localStorage.setItem('nazazi_payment_submissions', JSON.stringify(merged));
+              localStorage.setItem('nazazi_payment_submissions', JSON.stringify(finalList));
             }
-            return merged;
+            return finalList;
           });
         }
         if (data.connection) {

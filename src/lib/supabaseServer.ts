@@ -201,8 +201,50 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
   };
 }
 
+// Cached detected table and columns to avoid schema mismatch errors on subsequent requests
+let detectedTableCache: { tableName: string; columns: Set<string> } | null = null;
+
+async function discoverTableInfo(client: SupabaseClient): Promise<{ tableName: string; columns: Set<string> } | null> {
+  if (detectedTableCache) {
+    return detectedTableCache;
+  }
+
+  const candidateTables = [
+    'registrations',
+    'payments',
+    'subscriptions',
+    'subscribers',
+    'users',
+    'registration',
+    'payment',
+    'subscription',
+    'members',
+    'profiles',
+  ];
+
+  for (const tableName of candidateTables) {
+    try {
+      const { data, error } = await client.from(tableName).select('*').limit(5);
+      if (!error && Array.isArray(data)) {
+        const columns = new Set<string>();
+        if (data.length > 0) {
+          data.forEach((row: Record<string, unknown>) => {
+            Object.keys(row || {}).forEach((k) => columns.add(k.toLowerCase()));
+          });
+        }
+        detectedTableCache = { tableName, columns };
+        return detectedTableCache;
+      }
+    } catch {
+      // Continue to next table
+    }
+  }
+
+  return null;
+}
+
 /**
- * Saves a new registration record into Supabase with adaptive column stripping and table fallback.
+ * Saves a new registration record into Supabase with adaptive column discovery and fallback.
  */
 export async function saveRegistrationToSupabase(data: {
   name: string;
@@ -231,153 +273,223 @@ export async function saveRegistrationToSupabase(data: {
     created_at: nowIso,
   };
 
-  const client = getSupabaseClient();
+  // Always keep in-memory cache updated immediately
+  inMemoryRegistrations.unshift(record);
 
+  const client = getSupabaseClient();
   if (!client) {
-    inMemoryRegistrations.unshift(record);
     return {
       record,
       savedToSupabase: false,
-      error: 'Supabase credentials not configured in environment variables. Falling back to memory state.',
+      error: 'Supabase credentials not configured in environment variables.',
     };
   }
 
-  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+  // 1. Try autodiscovering the existing table and its exact schema
+  try {
+    const tableInfo = await discoverTableInfo(client);
+    const targetTable = tableInfo?.tableName || 'registrations';
+    const knownCols = tableInfo?.columns || new Set<string>();
 
-  for (const tableName of candidateTables) {
-    const payload: Record<string, unknown> = {
+    // Construct tailored payload matching known column names
+    const smartPayload: Record<string, unknown> = {};
+
+    // Name column mapping
+    if (knownCols.has('name')) {
+      smartPayload.name = record.name;
+    } else if (knownCols.has('full_name')) {
+      smartPayload.full_name = record.name;
+    } else if (knownCols.has('fullname')) {
+      smartPayload.fullname = record.name;
+    } else if (knownCols.has('user_name')) {
+      smartPayload.user_name = record.name;
+    } else if (knownCols.has('payer_name')) {
+      smartPayload.payer_name = record.name;
+    } else {
+      smartPayload.name = record.name;
+    }
+
+    // Phone column mapping
+    if (knownCols.has('phone_number')) {
+      smartPayload.phone_number = record.phone_number;
+    } else if (knownCols.has('phone')) {
+      smartPayload.phone = record.phone_number;
+    } else if (knownCols.has('user_phone')) {
+      smartPayload.user_phone = record.phone_number;
+    } else if (knownCols.has('mobile')) {
+      smartPayload.mobile = record.phone_number;
+    } else {
+      smartPayload.phone_number = record.phone_number;
+    }
+
+    // Payment image column mapping
+    if (knownCols.has('payment_image_url')) {
+      smartPayload.payment_image_url = record.payment_image_url;
+    } else if (knownCols.has('image_url')) {
+      smartPayload.image_url = record.payment_image_url;
+    } else if (knownCols.has('screenshot_url')) {
+      smartPayload.screenshot_url = record.payment_image_url;
+    } else if (knownCols.has('receipt_url')) {
+      smartPayload.receipt_url = record.payment_image_url;
+    } else if (knownCols.has('payment_image')) {
+      smartPayload.payment_image = record.payment_image_url;
+    } else if (knownCols.has('file_url')) {
+      smartPayload.file_url = record.payment_image_url;
+    } else {
+      smartPayload.payment_image_url = record.payment_image_url;
+    }
+
+    // Plan column mapping (only include if table supports it or schema unknown)
+    if (knownCols.size === 0 || knownCols.has('plan_name')) {
+      smartPayload.plan_name = record.plan_name;
+    } else if (knownCols.has('plan')) {
+      smartPayload.plan = record.plan_name;
+    } else if (knownCols.has('subscription_plan')) {
+      smartPayload.subscription_plan = record.plan_name;
+    } else if (knownCols.has('tier')) {
+      smartPayload.tier = record.plan_name;
+    } else if (knownCols.has('package')) {
+      smartPayload.package = record.plan_name;
+    }
+
+    // Amount column mapping (only include if table supports it or schema unknown)
+    if (knownCols.size === 0 || knownCols.has('amount')) {
+      smartPayload.amount = record.amount;
+    } else if (knownCols.has('price')) {
+      smartPayload.price = record.amount;
+    } else if (knownCols.has('fee')) {
+      smartPayload.fee = record.amount;
+    }
+
+    // Status column
+    if (knownCols.size === 0 || knownCols.has('status')) {
+      smartPayload.status = record.status;
+    }
+
+    // Try inserting tailored payload
+    const { data: insertedData, error: insertError } = await client
+      .from(targetTable)
+      .insert([smartPayload])
+      .select('*');
+
+    if (!insertError && insertedData && insertedData.length > 0) {
+      const insertedRecord = extractRowData(insertedData[0] as Record<string, unknown>, fallbackId);
+      if (!insertedRecord.name) insertedRecord.name = record.name;
+      if (!insertedRecord.phone_number) insertedRecord.phone_number = record.phone_number;
+      if (!insertedRecord.payment_image_url) insertedRecord.payment_image_url = record.payment_image_url;
+
+      // Update in-memory cache with the server ID
+      inMemoryRegistrations = inMemoryRegistrations.map((r) => (r.id === fallbackId ? insertedRecord : r));
+      return { record: insertedRecord, savedToSupabase: true };
+    }
+
+    // Try inserting without .select('*') in case of RLS select restriction
+    if (insertError) {
+      const { error: blindInsertError } = await client.from(targetTable).insert([smartPayload]);
+      if (!blindInsertError) {
+        return { record, savedToSupabase: true };
+      }
+    }
+  } catch (err) {
+    console.warn('Smart payload insertion attempt error:', err);
+  }
+
+  // 2. Comprehensive Multi-Candidate Fallback Matrix
+  const candidateTables = ['registrations', 'payments', 'subscriptions', 'subscribers', 'users', 'members'];
+  const candidatePayloads = [
+    // Variant 1: standard names
+    {
       name: record.name,
       phone_number: record.phone_number,
       payment_image_url: record.payment_image_url,
       plan_name: record.plan_name,
       amount: record.amount,
       status: record.status,
-    };
+    },
+    // Variant 2: standard without plan/amount (for basic schema)
+    {
+      name: record.name,
+      phone_number: record.phone_number,
+      payment_image_url: record.payment_image_url,
+      status: record.status,
+    },
+    // Variant 3: full_name / phone / image_url / plan / amount
+    {
+      full_name: record.name,
+      phone: record.phone_number,
+      image_url: record.payment_image_url,
+      plan: record.plan_name,
+      price: record.amount,
+      status: record.status,
+    },
+    // Variant 4: full_name / phone / image_url / status
+    {
+      full_name: record.name,
+      phone: record.phone_number,
+      image_url: record.payment_image_url,
+      status: record.status,
+    },
+    // Variant 5: full_name / phone / screenshot_url
+    {
+      full_name: record.name,
+      phone: record.phone_number,
+      screenshot_url: record.payment_image_url,
+      status: record.status,
+    },
+    // Variant 6: name / phone / receipt_url
+    {
+      name: record.name,
+      phone: record.phone_number,
+      receipt_url: record.payment_image_url,
+      status: record.status,
+    },
+    // Variant 7: minimal core
+    {
+      name: record.name,
+      phone_number: record.phone_number,
+      payment_image_url: record.payment_image_url,
+    },
+    // Variant 8: minimal full_name
+    {
+      full_name: record.name,
+      phone: record.phone_number,
+      image_url: record.payment_image_url,
+    },
+  ];
 
-    for (let attempt = 0; attempt < 6; attempt++) {
+  for (const tableName of candidateTables) {
+    for (const payload of candidatePayloads) {
       try {
         const { data: insertedData, error: insertError } = await client
           .from(tableName)
           .insert([payload])
           .select('*');
 
-        if (!insertError) {
-          const insertedRow = insertedData && insertedData.length > 0 ? insertedData[0] : null;
-          const formattedRecord = insertedRow
-            ? extractRowData(insertedRow as Record<string, unknown>, fallbackId)
-            : record;
+        if (!insertError && insertedData && insertedData.length > 0) {
+          const insertedRecord = extractRowData(insertedData[0] as Record<string, unknown>, fallbackId);
+          if (!insertedRecord.name) insertedRecord.name = record.name;
+          if (!insertedRecord.phone_number) insertedRecord.phone_number = record.phone_number;
+          if (!insertedRecord.payment_image_url) insertedRecord.payment_image_url = record.payment_image_url;
 
-          if (!formattedRecord.name) formattedRecord.name = record.name;
-          if (!formattedRecord.phone_number) formattedRecord.phone_number = record.phone_number;
-          if (!formattedRecord.payment_image_url) formattedRecord.payment_image_url = record.payment_image_url;
-
-          inMemoryRegistrations.unshift(formattedRecord);
-          return { record: formattedRecord, savedToSupabase: true };
+          inMemoryRegistrations = inMemoryRegistrations.map((r) => (r.id === fallbackId ? insertedRecord : r));
+          return { record: insertedRecord, savedToSupabase: true };
         }
 
-        const errMsg = insertError.message || '';
-
-        // Check if table relation does not exist
-        if (insertError.code === '42P01' || errMsg.includes('relation') || errMsg.includes('does not exist')) {
-          break;
-        }
-
-        // Dynamically strip or remap unknown column
-        const missingColMatch = errMsg.match(/column ['"]?([a-zA-Z0-9_]+)['"]? of relation|Could not find the ['"]?([a-zA-Z0-9_]+)['"]? column/i);
-        const missingCol = missingColMatch ? (missingColMatch[1] || missingColMatch[2]) : null;
-
-        if (missingCol && missingCol in payload) {
-          if (missingCol === 'name') {
-            delete payload.name;
-            payload.full_name = record.name;
-          } else if (missingCol === 'full_name') {
-            delete payload.full_name;
-            payload.user_name = record.name;
-          } else if (missingCol === 'phone_number') {
-            delete payload.phone_number;
-            payload.phone = record.phone_number;
-          } else if (missingCol === 'phone') {
-            delete payload.phone;
-            payload.user_phone = record.phone_number;
-          } else if (missingCol === 'payment_image_url') {
-            delete payload.payment_image_url;
-            payload.image_url = record.payment_image_url;
-          } else if (missingCol === 'image_url') {
-            delete payload.image_url;
-            payload.screenshot_url = record.payment_image_url;
-          } else if (missingCol === 'screenshot_url') {
-            delete payload.screenshot_url;
-            payload.receipt_url = record.payment_image_url;
-          } else if (missingCol === 'plan_name') {
-            delete payload.plan_name;
-            payload.plan = record.plan_name;
-          } else if (missingCol === 'plan') {
-            delete payload.plan;
-            payload.subscription_plan = record.plan_name;
-          } else if (missingCol === 'subscription_plan') {
-            delete payload.subscription_plan;
-            payload.tier = record.plan_name;
-          } else if (missingCol === 'amount') {
-            delete payload.amount;
-            payload.price = record.amount;
-          } else if (missingCol === 'price') {
-            delete payload.price;
-            payload.fee = record.amount;
-          } else {
-            delete payload[missingCol];
-          }
-          continue;
-        }
-
-        // Try minimal core columns
-        if (attempt === 2) {
-          const minimalPayload: Record<string, unknown> = {
-            name: record.name,
-            phone_number: record.phone_number,
-            payment_image_url: record.payment_image_url,
-          };
-          const { data: minData, error: minErr } = await client
-            .from(tableName)
-            .insert([minimalPayload])
-            .select('*');
-
-          if (!minErr && minData && minData.length > 0) {
-            const row = extractRowData(minData[0] as Record<string, unknown>, fallbackId);
-            if (!row.name) row.name = record.name;
-            inMemoryRegistrations.unshift(row);
-            return { record: row, savedToSupabase: true };
-          }
-        }
-
-        if (attempt === 3) {
-          const altPayload: Record<string, unknown> = {
-            full_name: record.name,
-            phone: record.phone_number,
-            image_url: record.payment_image_url,
-          };
-          const { data: altData, error: altErr } = await client
-            .from(tableName)
-            .insert([altPayload])
-            .select('*');
-
-          if (!altErr && altData && altData.length > 0) {
-            const row = extractRowData(altData[0] as Record<string, unknown>, fallbackId);
-            if (!row.name) row.name = record.name;
-            inMemoryRegistrations.unshift(row);
-            return { record: row, savedToSupabase: true };
-          }
+        // Try blind insert without select
+        const { error: blindErr } = await client.from(tableName).insert([payload]);
+        if (!blindErr) {
+          return { record, savedToSupabase: true };
         }
       } catch {
-        break;
+        continue;
       }
     }
   }
 
-  inMemoryRegistrations.unshift(record);
   return {
     record,
     savedToSupabase: false,
-    error: 'Could not insert into Supabase database (data preserved in memory).',
+    error: 'Inserted into in-memory state. Supabase database schema did not accept candidate payloads.',
   };
 }
 
@@ -515,7 +627,18 @@ export async function getAllRegistrations(): Promise<{
     };
   }
 
-  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+  const candidateTables = [
+    'registrations',
+    'payments',
+    'subscriptions',
+    'subscribers',
+    'users',
+    'registration',
+    'payment',
+    'subscription',
+    'members',
+    'profiles',
+  ];
 
   for (const tableName of candidateTables) {
     try {
@@ -548,8 +671,22 @@ export async function getAllRegistrations(): Promise<{
         };
       });
 
+      // Merge any pending/recent in-memory registrations that aren't in Supabase yet
+      const combined = [...list];
+      const seenIds = new Set(list.map((r) => r.id));
+      const seenPhones = new Set(list.map((r) => normalizePhoneKey(r.phone_number)).filter(Boolean));
+
+      for (const mem of inMemoryRegistrations) {
+        const memPhone = normalizePhoneKey(mem.phone_number);
+        if (!seenIds.has(mem.id) && (!memPhone || !seenPhones.has(memPhone))) {
+          seenIds.add(mem.id);
+          if (memPhone) seenPhones.add(memPhone);
+          combined.unshift(mem);
+        }
+      }
+
       return {
-        registrations: list,
+        registrations: combined,
         isFromSupabase: true,
       };
     } catch (err) {
