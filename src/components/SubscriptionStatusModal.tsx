@@ -165,6 +165,17 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
       setPhoneInput(initialSubmission.userPhone);
       setPhoneSearchError(null);
       setIsManualSearchOpen(false);
+
+      // Perform background live check to ensure we display the latest database status
+      if (initialSubmission.userPhone) {
+        checkStatusLiveRef.current(initialSubmission.userPhone)
+          .then((fresh) => {
+            if (fresh) {
+              setActiveSubmission(fresh);
+            }
+          })
+          .catch(() => {});
+      }
     } else if (initialPhone) {
       setPhoneInput(initialPhone);
       setPhoneSearchError(null);
@@ -183,10 +194,26 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
     performLookup(phoneInput);
   };
 
-  const status = activeSubmission?.status || 'pending';
-  const isApproved = status === 'approved';
-  const isRejected = status === 'rejected';
-  const isPending = status === 'pending';
+  const rawStatus = String(activeSubmission?.status || '').toLowerCase().trim();
+  const isApproved =
+    rawStatus === 'approved' ||
+    rawStatus === 'active' ||
+    rawStatus === 'verified' ||
+    rawStatus === 'completed' ||
+    rawStatus === 'success' ||
+    rawStatus === 'confirmed' ||
+    rawStatus === 'accept' ||
+    rawStatus === 'accepted';
+  const isRejected =
+    rawStatus === 'rejected' ||
+    rawStatus === 'declined' ||
+    rawStatus === 'denied' ||
+    rawStatus === 'canceled' ||
+    rawStatus === 'cancelled' ||
+    rawStatus === 'failed' ||
+    rawStatus === 'reject' ||
+    rawStatus === 'decline';
+  const isPending = !isApproved && !isRejected;
 
   // Helper to format clean plan display without duplicated currency text
   const getFormattedPlan = () => {

@@ -20,6 +20,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Stack+Sans+Headline:wght@200..700&display=swap"
           rel="stylesheet"
         />
+        <link rel="stylesheet" href="https://www.geezarchive.com/css2?family=Tayitu&display=swap" />
+        <link rel="stylesheet" href="https://www.geezarchive.com/css2?family=Habesha%2BSerif&display=swap" />
         <link
           rel="stylesheet"
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200"

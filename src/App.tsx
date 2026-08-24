@@ -6,7 +6,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
 import { PaymentProvider } from './context/PaymentContext';
-import { LanguageProvider } from './context/LanguageContext';
+import { LanguageProvider, useLanguage } from './context/LanguageContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { LandingView } from './views/LandingView';
@@ -15,6 +15,7 @@ import { ErrorViews } from './views/ErrorViews';
 import { SubscriptionStatusModal } from './components/SubscriptionStatusModal';
 
 function MainApp() {
+  const { language } = useLanguage();
   const [activeTab, setActiveTab] = useState<NavigationTab>('landing');
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
   const [verifySubmission, setVerifySubmission] = useState<PaymentSubmission | null>(null);
@@ -41,7 +42,7 @@ function MainApp() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-[#09090B] text-zinc-900 dark:text-zinc-50 font-sans transition-colors duration-200 selection:bg-zinc-900 selection:text-zinc-50 dark:selection:bg-zinc-100 dark:selection:text-zinc-900 flex flex-col justify-between">
+    <div className={`min-h-screen bg-white dark:bg-[#09090B] text-zinc-900 dark:text-zinc-50 transition-colors duration-200 selection:bg-zinc-900 selection:text-zinc-50 dark:selection:bg-zinc-100 dark:selection:text-zinc-900 flex flex-col justify-between ${language === 'am' ? 'lang-am' : 'font-sans'}`}>
       <div>
         {/* Navigation Header - Rendered only on user-facing pages, hidden in Admin Console */}
         {activeTab !== 'admin' && (

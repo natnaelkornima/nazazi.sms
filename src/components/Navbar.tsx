@@ -65,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span>N</span>
             </div>
             <div className="flex flex-col">
-              <span className="font-black tracking-tight text-lg text-zinc-900 dark:text-zinc-50 leading-none">
+              <span className={`font-black tracking-tight text-lg text-zinc-900 dark:text-zinc-50 leading-none ${isAmharic ? 'font-nazazi' : ''}`}>
                 {t('header.title')}
               </span>
               <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium pt-0.5">

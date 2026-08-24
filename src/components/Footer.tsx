@@ -30,7 +30,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenVerifyModal })
               <div className="w-7 h-7 rounded-lg bg-zinc-900 dark:bg-zinc-100 flex items-center justify-center text-white dark:text-zinc-950 font-black text-xs shadow-sm">
                 N
               </div>
-              <span className="font-extrabold text-sm tracking-tight text-zinc-900 dark:text-zinc-100">
+              <span className={`font-extrabold text-sm tracking-tight text-zinc-900 dark:text-zinc-100 ${isAmharic ? 'font-nazazi' : ''}`}>
                 {t('header.title')}
               </span>
             </div>

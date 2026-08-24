@@ -98,9 +98,24 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     submittedAt?: string;
     reviewed_at?: string | null;
   }): PaymentSubmission => {
-    const rawStatus = record.status || 'pending';
+    const rawStatus = String(record.status || 'pending').toLowerCase().trim();
     const status: PaymentStatus =
-      rawStatus === 'approved' ? 'approved' : rawStatus === 'rejected' ? 'rejected' : 'pending';
+      rawStatus === 'approved' ||
+      rawStatus === 'active' ||
+      rawStatus === 'verified' ||
+      rawStatus === 'completed' ||
+      rawStatus === 'success' ||
+      rawStatus === 'confirmed' ||
+      rawStatus === 'accepted'
+        ? 'approved'
+        : rawStatus === 'rejected' ||
+          rawStatus === 'declined' ||
+          rawStatus === 'denied' ||
+          rawStatus === 'canceled' ||
+          rawStatus === 'cancelled' ||
+          rawStatus === 'failed'
+        ? 'rejected'
+        : 'pending';
 
     const phone = record.phone_number || record.userPhone || '';
     const name = record.name || record.userName || 'Member';

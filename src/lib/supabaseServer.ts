@@ -224,10 +224,19 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
     rawStatus === 'active' ||
     rawStatus === 'verified' ||
     rawStatus === 'completed' ||
+    rawStatus === 'success' ||
+    rawStatus === 'confirmed' ||
+    rawStatus === 'accept' ||
+    rawStatus === 'accepted' ||
     row.is_approved === true ||
     row.approved === true ||
     row.is_verified === true ||
-    row.verified === true
+    row.verified === true ||
+    row.is_active === true ||
+    row.active === true ||
+    String(row.is_approved) === 'true' ||
+    String(row.approved) === 'true' ||
+    String(row.is_active) === 'true'
   ) {
     status = 'approved';
   } else if (
@@ -236,12 +245,33 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
     rawStatus === 'denied' ||
     rawStatus === 'canceled' ||
     rawStatus === 'cancelled' ||
+    rawStatus === 'failed' ||
+    rawStatus === 'reject' ||
+    rawStatus === 'decline' ||
     row.is_rejected === true ||
-    row.rejected === true
+    row.rejected === true ||
+    row.is_declined === true ||
+    row.declined === true ||
+    String(row.is_rejected) === 'true' ||
+    String(row.rejected) === 'true' ||
+    String(row.is_declined) === 'true'
   ) {
     status = 'rejected';
   } else {
     status = 'pending';
+  }
+
+  // Check if override map exists for this phone or id
+  const phoneCleanDigits = phoneStr.replace(/\D/g, '');
+  const phoneLast8 = phoneCleanDigits.slice(-8);
+  const override =
+    statusOverridesMap.get(idStr) ||
+    (phoneCleanDigits ? statusOverridesMap.get(phoneCleanDigits) : undefined) ||
+    (phoneLast8 && phoneLast8.length >= 7 ? statusOverridesMap.get(phoneLast8) : undefined) ||
+    statusOverridesMap.get(phoneStr);
+
+  if (override && (override.status === 'approved' || override.status === 'rejected')) {
+    status = override.status;
   }
 
   return {
@@ -253,7 +283,7 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
     amount: amountVal,
     status,
     created_at: String(row.created_at || new Date().toISOString()),
-    reviewed_at: row.reviewed_at ? String(row.reviewed_at) : null,
+    reviewed_at: override?.reviewed_at || (row.reviewed_at ? String(row.reviewed_at) : null),
   };
 }
 
@@ -595,22 +625,7 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
     );
   };
 
-  // 1. Fast in-memory check (instant response for current runtime)
-  const localMatch = inMemoryRegistrations.find((r) => phoneMatches(r.phone_number, rawInput));
-  if (localMatch) {
-    const override = getCachedOverride(localMatch.id, localMatch.phone_number);
-    let finalStatus = localMatch.status || 'pending';
-    if (override?.status === 'approved' || override?.status === 'rejected') {
-      finalStatus = override.status;
-    }
-    return {
-      ...localMatch,
-      status: finalStatus,
-      reviewed_at: override?.reviewed_at || localMatch.reviewed_at || null,
-    };
-  }
-
-  // 2. Query Supabase with a strict 2-second timeout to prevent UI hanging
+  // 1. Query Supabase first for authoritative real-time status
   const client = getSupabaseClient();
   if (client) {
     try {
@@ -666,7 +681,7 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
               const override = getCachedOverride(parsed.id, parsed.phone_number);
 
               let finalStatus = parsed.status;
-              if (override?.status === 'approved' || override?.status === 'rejected') {
+              if (override && (override.status === 'approved' || override.status === 'rejected')) {
                 finalStatus = override.status;
               }
 
@@ -676,10 +691,11 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
                 reviewed_at: override?.reviewed_at || parsed.reviewed_at || null,
               };
 
-              // Cache in memory for subsequent instant lookups
-              if (!inMemoryRegistrations.some((r) => r.id === resultRecord.id)) {
-                inMemoryRegistrations = [resultRecord, ...inMemoryRegistrations];
-              }
+              // Update in-memory cache to stay in sync with database
+              inMemoryRegistrations = [
+                resultRecord,
+                ...inMemoryRegistrations.filter((r) => r.id !== resultRecord.id && !phoneMatches(r.phone_number, resultRecord.phone_number)),
+              ];
 
               return resultRecord;
             }
@@ -690,7 +706,7 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
         return null;
       })();
 
-      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2200));
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500));
       const supabaseResult = await Promise.race([queryPromise, timeoutPromise]);
       if (supabaseResult) {
         return supabaseResult;
@@ -700,14 +716,18 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
     }
   }
 
-  // 3. Final in-memory re-check
-  const finalMatch = inMemoryRegistrations.find((r) => phoneMatches(r.phone_number, rawInput));
-  if (finalMatch) {
-    const override = getCachedOverride(finalMatch.id, finalMatch.phone_number);
+  // 2. In-memory fallback if Supabase is offline or hasn't persisted yet
+  const localMatch = inMemoryRegistrations.find((r) => phoneMatches(r.phone_number, rawInput));
+  if (localMatch) {
+    const override = getCachedOverride(localMatch.id, localMatch.phone_number);
+    let finalStatus = localMatch.status || 'pending';
+    if (override && (override.status === 'approved' || override.status === 'rejected')) {
+      finalStatus = override.status;
+    }
     return {
-      ...finalMatch,
-      status: override?.status || finalMatch.status || 'pending',
-      reviewed_at: override?.reviewed_at || finalMatch.reviewed_at || null,
+      ...localMatch,
+      status: finalStatus,
+      reviewed_at: override?.reviewed_at || localMatch.reviewed_at || null,
     };
   }
 
@@ -981,26 +1001,29 @@ export async function updateRegistrationStatus(
 
   for (const tableName of candidateTables) {
     try {
-      if (id && !id.startsWith('reg_')) {
-        const { error } = await client
-          .from(tableName)
-          .update({ status, reviewed_at: nowIso })
-          .eq('id', id);
+      const updatePayloads = [
+        { status, reviewed_at: nowIso, updated_at: nowIso },
+        { status, reviewed_at: nowIso },
+        { status },
+        { is_approved: status === 'approved', is_rejected: status === 'rejected', reviewed_at: nowIso },
+        { approved: status === 'approved', rejected: status === 'rejected' },
+        { state: status, reviewed_at: nowIso },
+        { payment_status: status },
+        { subscription_status: status },
+      ];
 
-        if (error) {
-          await client.from(tableName).update({ status }).eq('id', id);
+      for (const payload of updatePayloads) {
+        if (id && !id.startsWith('reg_')) {
+          const { error } = await client.from(tableName).update(payload).eq('id', id);
+          if (!error) break;
         }
       }
 
       if (last8 && last8.length >= 7) {
         for (const phoneCol of ['phone_number', 'phone', 'user_phone', 'mobile']) {
-          const { error } = await client
-            .from(tableName)
-            .update({ status, reviewed_at: nowIso })
-            .ilike(phoneCol, `%${last8}%`);
-
-          if (error) {
-            await client.from(tableName).update({ status }).ilike(phoneCol, `%${last8}%`);
+          for (const payload of updatePayloads) {
+            const { error } = await client.from(tableName).update(payload).ilike(phoneCol, `%${last8}%`);
+            if (!error) break;
           }
         }
       }

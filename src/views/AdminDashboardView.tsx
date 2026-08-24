@@ -1270,7 +1270,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                approvePayment(sub.id);
+                                approvePayment(sub.id, sub.userPhone);
                                 success('Approved!', `Activated for ${sub.userPhone}`);
                               }}
                               className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all cursor-pointer shadow-2xs"
@@ -1282,7 +1282,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                rejectPayment(sub.id);
+                                rejectPayment(sub.id, sub.userPhone);
                                 info('Rejected', `Marked ${sub.userPhone} as rejected`);
                               }}
                               className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 transition-all cursor-pointer border border-rose-200 dark:border-rose-900"
@@ -1313,7 +1313,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              approvePayment(sub.id);
+                              approvePayment(sub.id, sub.userPhone);
                               success('Approved', `Status updated to active for ${sub.userPhone}`);
                             }}
                             className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
@@ -1568,7 +1568,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    approvePayment(sub.id);
+                                    approvePayment(sub.id, sub.userPhone);
                                     success('Approved', `Status updated to active for ${sub.userPhone}`);
                                   }}
                                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/50 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"

@@ -231,7 +231,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <span className="px-2 py-0.5 rounded-full bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 text-[10px] font-black uppercase tracking-wider shadow-2xs">
               {isAmharic ? 'አዲስ' : 'New'}
             </span>
-            <span>{isAmharic ? 'የሚያጽናኑ የሚያበረቱ ለልብ የሆኑ የእግዚአብሔር ቃላት' : 'Meet Nazazi SMS'}</span>
+            <span>{isAmharic ? 'ለነፍስ የቀረቡ መልዕክቶች' : 'Meet Nazazi SMS'}</span>
           </motion.div>
 
           {/* Main Large Brand Title with Smooth Animated Gradient Text */}
@@ -251,7 +251,9 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
             <h1 className="text-7xl sm:text-8xl lg:text-9xl xl:text-[115px] font-black tracking-tight leading-none select-none drop-shadow-md">
               <motion.span
-                className="bg-gradient-to-r from-zinc-950 via-zinc-500 to-zinc-950 dark:from-white dark:via-zinc-300 dark:to-white bg-[length:200%_100%] bg-clip-text text-transparent inline-block pb-1"
+                className={`bg-gradient-to-r from-zinc-950 via-zinc-500 to-zinc-950 dark:from-white dark:via-zinc-300 dark:to-white bg-[length:200%_100%] bg-clip-text text-transparent inline-block pb-1 ${
+                  isAmharic ? 'font-nazazi' : ''
+                }`}
                 animate={{
                   backgroundPosition: ['0% 50%', '200% 50%']
                 }}
@@ -273,46 +275,52 @@ export const LandingView: React.FC<LandingViewProps> = ({
             transition={{ duration: 0.5, delay: 0.15 }}
             className="text-lg sm:text-2xl md:text-3xl font-bold tracking-tight text-zinc-800 dark:text-zinc-200 leading-snug max-w-2xl mx-auto"
           >
-            {t('landing.heroTitle')}
+            {isAmharic ? (
+              <>
+                <span className="font-nazazi font-bold">ናዛዚ</span> የሚያጽናኑ የሚያበረቱ ለልብ የሆኑ የእግዚአብሔር ቃላት
+              </>
+            ) : (
+              t('landing.heroTitle')
+            )}
           </motion.h2>
 
-          {/* Clean High-Contrast Eye-Catching Action Buttons */}
+          {/* Clean High-Contrast Action Buttons with Fixed Compact Padding & 5px Radius */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4 pt-2 sm:pt-4 w-full sm:w-auto"
+            className="flex flex-row flex-wrap sm:flex-nowrap items-center justify-center gap-2.5 sm:gap-3 pt-2 sm:pt-4 w-auto mx-auto"
           >
-            {/* Premium Black Action Pill with Subtle Dynamic Light Sweep */}
+            {/* Subscribe Now Button */}
             <motion.button
-              whileHover={{ scale: 1.03, y: -2 }}
+              whileHover={{ scale: 1.02, y: -1 }}
               whileTap={{ scale: 0.98, y: 0 }}
               onClick={scrollToPricing}
-              className="group relative w-full sm:w-auto px-8 py-3.5 rounded-full font-extrabold text-sm text-white bg-zinc-950 hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 shadow-[0_12px_30px_-6px_rgba(0,0,0,0.45)] dark:shadow-[0_12px_30px_-6px_rgba(255,255,255,0.22)] transition-all duration-200 cursor-pointer flex items-center justify-center gap-2.5 border border-zinc-800/80 dark:border-zinc-200 ring-1 ring-white/15 dark:ring-black/10 overflow-hidden"
+              className="group relative w-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-[5px] font-bold text-xs sm:text-sm text-white bg-zinc-950 hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 shadow-[0_4px_14px_rgba(0,0,0,0.2)] dark:shadow-[0_4px_14px_rgba(255,255,255,0.12)] transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-2 border border-zinc-800/80 dark:border-zinc-200 ring-1 ring-white/15 dark:ring-black/10 overflow-hidden shrink-0"
             >
               {/* Animated Light Sweep Reflection */}
               <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-black/10 to-transparent pointer-events-none" />
 
-              <span className="relative z-10 tracking-tight">{isAmharic ? 'ይመዝገቡ' : 'Subscribe Now'}</span>
-              <ArrowRight className="relative z-10 w-4 h-4 text-zinc-300 dark:text-zinc-700 transition-transform duration-200 group-hover:translate-x-1" />
+              <span className="relative z-10 tracking-tight whitespace-nowrap">{isAmharic ? 'ይመዝገቡ' : 'Subscribe Now'}</span>
+              <ArrowRight className="relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-300 dark:text-zinc-700 transition-transform duration-200 group-hover:translate-x-1 shrink-0" />
             </motion.button>
 
-            {/* Premium Frosted Glass Secondary Pill with Live Status Beacon */}
+            {/* Verify Approval Status Button */}
             <motion.button
-              whileHover={{ scale: 1.02, y: -1.5 }}
+              whileHover={{ scale: 1.02, y: -1 }}
               whileTap={{ scale: 0.98, y: 0 }}
               onClick={() => handleTriggerVerifyModal()}
-              className="group relative w-full sm:w-auto px-7 py-3.5 rounded-full font-bold text-sm text-zinc-800 dark:text-zinc-100 bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-900 backdrop-blur-md border border-zinc-300/80 dark:border-zinc-700/80 hover:border-zinc-400 dark:hover:border-zinc-600 shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)] hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-2.5"
+              className="group relative w-auto px-3.5 py-2 sm:px-4.5 sm:py-2.5 rounded-[5px] font-semibold text-xs sm:text-sm text-zinc-800 dark:text-zinc-100 bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-900 backdrop-blur-md border border-zinc-300/80 dark:border-zinc-700/80 hover:border-zinc-400 dark:hover:border-zinc-600 shadow-[0_2px_10px_rgba(0,0,0,0.04)] dark:shadow-[0_2px_10px_rgba(0,0,0,0.25)] hover:shadow-md transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-2 shrink-0"
             >
               {/* Subtle Live Pulse Beacon on Smartphone Icon */}
-              <div className="relative flex items-center justify-center">
-                <Smartphone className="w-4 h-4 text-zinc-700 dark:text-zinc-300 transition-transform duration-200 group-hover:scale-110" />
+              <div className="relative flex items-center justify-center shrink-0">
+                <Smartphone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-700 dark:text-zinc-300 transition-transform duration-200 group-hover:scale-110" />
                 <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
                   <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
                 </span>
               </div>
-              <span className="tracking-tight">{isAmharic ? 'የአባልነት ማረጋገጫ በስልክ ቁጥር' : 'Verify Approval Status'}</span>
+              <span className="tracking-tight whitespace-nowrap">{isAmharic ? 'የአባልነት ማረጋገጫ በስልክ ቁጥር' : 'Verify Approval Status'}</span>
             </motion.button>
           </motion.div>
         </section>
@@ -532,19 +540,19 @@ export const LandingView: React.FC<LandingViewProps> = ({
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <div className="flex flex-row flex-wrap sm:flex-nowrap items-center justify-center gap-2.5 sm:gap-3">
             <Button
-              size="lg"
+              size="md"
               onClick={scrollToPricing}
-              className="w-full sm:w-auto bg-white text-zinc-950 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 font-extrabold shadow-md"
+              className="w-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-[5px] text-xs sm:text-sm bg-white text-zinc-950 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 font-extrabold shadow-md shrink-0"
             >
               {isAmharic ? 'አሁኑኑ ተመዝገቡ' : 'Subscribe Now'}
             </Button>
             <Button
-              size="lg"
+              size="md"
               variant="outline"
               onClick={() => handleTriggerVerifyModal(null)}
-              className="w-full sm:w-auto border-zinc-700 dark:border-zinc-300 text-zinc-200 dark:text-zinc-800 font-bold"
+              className="w-auto px-3.5 py-2 sm:px-4.5 sm:py-2.5 rounded-[5px] text-xs sm:text-sm border-zinc-700 dark:border-zinc-300 text-zinc-200 dark:text-zinc-800 font-bold shrink-0"
             >
               {isAmharic ? 'የአባልነት ማረጋገጫ በስልክ ቁጥር' : 'Verify Approval Status'}
             </Button>
