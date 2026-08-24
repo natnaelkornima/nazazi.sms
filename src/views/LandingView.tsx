@@ -276,30 +276,44 @@ export const LandingView: React.FC<LandingViewProps> = ({
             {t('landing.heroTitle')}
           </motion.h2>
 
-          {/* Clean High-Contrast Action Buttons */}
+          {/* Clean High-Contrast Eye-Catching Action Buttons */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-3.5 sm:gap-4 pt-2 sm:pt-4 w-full sm:w-auto"
           >
-            {/* Pure Black Action Pill */}
-            <button
+            {/* Premium Black Action Pill with Subtle Dynamic Light Sweep */}
+            <motion.button
+              whileHover={{ scale: 1.03, y: -2 }}
+              whileTap={{ scale: 0.98, y: 0 }}
               onClick={scrollToPricing}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-full font-extrabold text-sm text-white bg-zinc-950 hover:bg-zinc-850 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 shadow-[0_10px_30px_-5px_rgba(0,0,0,0.5)] dark:shadow-[0_10px_30px_-5px_rgba(255,255,255,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer flex items-center justify-center gap-2 border border-zinc-800 dark:border-zinc-200"
+              className="group relative w-full sm:w-auto px-8 py-3.5 rounded-full font-extrabold text-sm text-white bg-zinc-950 hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 shadow-[0_12px_30px_-6px_rgba(0,0,0,0.45)] dark:shadow-[0_12px_30px_-6px_rgba(255,255,255,0.22)] transition-all duration-200 cursor-pointer flex items-center justify-center gap-2.5 border border-zinc-800/80 dark:border-zinc-200 ring-1 ring-white/15 dark:ring-black/10 overflow-hidden"
             >
-              <span>{isAmharic ? 'ይመዝገቡ' : 'Subscribe'}</span>
-              <ArrowRight className="w-4 h-4 text-zinc-300 dark:text-zinc-700" />
-            </button>
+              {/* Animated Light Sweep Reflection */}
+              <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-black/10 to-transparent pointer-events-none" />
 
-            {/* Clean Frosted Pill Secondary Button */}
-            <button
+              <span className="relative z-10 tracking-tight">{isAmharic ? 'ይመዝገቡ' : 'Subscribe Now'}</span>
+              <ArrowRight className="relative z-10 w-4 h-4 text-zinc-300 dark:text-zinc-700 transition-transform duration-200 group-hover:translate-x-1" />
+            </motion.button>
+
+            {/* Premium Frosted Glass Secondary Pill with Live Status Beacon */}
+            <motion.button
+              whileHover={{ scale: 1.02, y: -1.5 }}
+              whileTap={{ scale: 0.98, y: 0 }}
               onClick={() => handleTriggerVerifyModal()}
-              className="w-full sm:w-auto px-7 py-3.5 rounded-full font-bold text-sm text-zinc-800 dark:text-zinc-200 bg-white/90 dark:bg-zinc-900/90 hover:bg-zinc-100 dark:hover:bg-zinc-800/90 border border-zinc-200/90 dark:border-zinc-700/80 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+              className="group relative w-full sm:w-auto px-7 py-3.5 rounded-full font-bold text-sm text-zinc-800 dark:text-zinc-100 bg-white/90 dark:bg-zinc-900/90 hover:bg-white dark:hover:bg-zinc-900 backdrop-blur-md border border-zinc-300/80 dark:border-zinc-700/80 hover:border-zinc-400 dark:hover:border-zinc-600 shadow-[0_4px_16px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_16px_rgba(0,0,0,0.4)] hover:shadow-lg transition-all duration-200 cursor-pointer flex items-center justify-center gap-2.5"
             >
-              <Smartphone className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
-              <span>{isAmharic ? 'የአባልነት ማረጋገጫ በስልክ ቁጥር' : 'Verify Approval Status'}</span>
-            </button>
+              {/* Subtle Live Pulse Beacon on Smartphone Icon */}
+              <div className="relative flex items-center justify-center">
+                <Smartphone className="w-4 h-4 text-zinc-700 dark:text-zinc-300 transition-transform duration-200 group-hover:scale-110" />
+                <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+                </span>
+              </div>
+              <span className="tracking-tight">{isAmharic ? 'የአባልነት ማረጋገጫ በስልክ ቁጥር' : 'Verify Approval Status'}</span>
+            </motion.button>
           </motion.div>
         </section>
 

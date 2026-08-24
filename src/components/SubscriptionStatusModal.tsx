@@ -256,18 +256,20 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                   </span>
                 </div>
 
-                <div className="text-center space-y-1.5 pt-1">
-                  <div className="w-12 h-12 mx-auto rounded-2xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center text-zinc-700 dark:text-zinc-200 shadow-inner">
-                    <Search className="w-5 h-5 stroke-[2.2]" />
+                <div className="text-center space-y-2 pt-2">
+                  <div className="w-12 h-12 mx-auto rounded-2xl bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200/80 dark:border-zinc-700/80 flex items-center justify-center text-zinc-800 dark:text-zinc-200 shadow-2xs">
+                    <Smartphone className="w-5 h-5 stroke-[2.2]" />
                   </div>
-                  <h3 className="text-lg font-extrabold tracking-tight text-zinc-900 dark:text-white">
-                    {isAmharic ? 'የስልክ ቁጥርዎን ያስገቡ' : 'Verify Approval Status'}
-                  </h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto leading-relaxed">
-                    {isAmharic
-                      ? 'የተመዘገቡበትን የኢትዮጵያ ስልክ ቁጥር በማስገባት የጸደቀ፣ በመጠባበቅ ወይም ውድቅ የተደረገ መሆኑን ያረጋግጡ'
-                      : 'Enter your phone number to check if your subscription is Approved, Pending, or Declined.'}
-                  </p>
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-black tracking-tight text-zinc-950 dark:text-white">
+                      {isAmharic ? 'የአባልነት ማረጋገጫ በስልክ ቁጥር' : 'Verify Approval Status'}
+                    </h3>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto leading-relaxed">
+                      {isAmharic
+                        ? 'የተመዘገቡበትን የኢትዮጵያ ስልክ ቁጥር በማስገባት የጸደቀ፣ በመጠባበቅ ወይም ውድቅ የተደረገ መሆኑን ወዲያውኑ ያረጋግጡ።'
+                        : 'Enter your registered Ethiopian phone number to verify real-time approval status.'}
+                    </p>
+                  </div>
                 </div>
 
                 <form onSubmit={handleSearch} className="space-y-3 pt-2">
@@ -293,7 +295,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                     type="submit"
                     size="sm"
                     disabled={isSearching}
-                    className="w-full font-bold text-xs bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-900 h-10 rounded-xl cursor-pointer shadow-xs"
+                    className="w-full font-extrabold text-xs bg-zinc-950 hover:bg-zinc-900 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 h-10 rounded-xl cursor-pointer shadow-sm"
                     leftIcon={
                       isSearching ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -308,7 +310,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                         : 'Checking Live Status...'
                       : isAmharic
                         ? 'ሁኔታ አረጋግጥ'
-                        : 'Check Status'}
+                        : 'Check Approval Status'}
                   </Button>
                 </form>
               </motion.div>
@@ -385,63 +387,37 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-                className="space-y-4 pt-2"
+                className="space-y-4 pt-1"
               >
-                {/* HERO ANIMATION BADGE SECTION - SLEEK, MODERN & PROPERLY SPACED */}
-                <div className="text-center pt-2 pb-1 space-y-3">
+                {/* HERO ANIMATION BADGE SECTION - SLEEK, MODERN & PREMIUM */}
+                <div className="text-center pt-1 pb-1 space-y-3">
                   {/* GREEN ANIMATION FOR APPROVED & ACTIVE */}
                   {isApproved && (
-                    <div className="relative h-24 flex items-center justify-center overflow-visible">
+                    <div className="relative h-20 flex items-center justify-center overflow-visible">
                       {/* Ambient soft glow backdrop */}
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: [0.4, 0.7, 0.4], scale: [0.95, 1.08, 0.95] }}
-                        transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-                        className="absolute w-28 h-28 rounded-full bg-emerald-500/20 dark:bg-emerald-400/20 blur-xl pointer-events-none"
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: [0.35, 0.6, 0.35], scale: [0.95, 1.05, 0.95] }}
+                        transition={{ repeat: Infinity, duration: 2.8, ease: 'easeInOut' }}
+                        className="absolute w-24 h-24 rounded-full bg-emerald-500/20 dark:bg-emerald-400/20 blur-lg pointer-events-none"
                       />
 
-                      {/* Rotating subtle orbital particle / dashed ring */}
+                      {/* Smooth breathing accent ring */}
                       <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ repeat: Infinity, duration: 12, ease: 'linear' }}
-                        className="absolute w-22 h-22 rounded-full border border-emerald-500/25 border-dashed pointer-events-none"
+                        animate={{ scale: [1, 1.12, 1], opacity: [0.5, 0.15, 0.5] }}
+                        transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
+                        className="absolute w-18 h-18 rounded-full border border-emerald-500/30 dark:border-emerald-400/30 pointer-events-none"
                       />
 
-                      {/* Floating Micro-sparkle 1 */}
+                      {/* Center Sleek Emerald Glass Badge */}
                       <motion.div
-                        initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                        animate={{ opacity: [0, 1, 0], y: [-6, -18], scale: [0.6, 1, 0.6] }}
-                        transition={{ repeat: Infinity, duration: 2.2, delay: 0.2, ease: 'easeOut' }}
-                        className="absolute -top-1 right-1/3 text-emerald-500 dark:text-emerald-300 pointer-events-none"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: 'spring', damping: 16, stiffness: 260 }}
+                        className="relative z-10 p-1 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 ring-2 ring-emerald-500/30 backdrop-blur-xs"
                       >
-                        <Sparkles className="w-3.5 h-3.5" />
-                      </motion.div>
-
-                      {/* Floating Micro-sparkle 2 */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 0, scale: 0.5 }}
-                        animate={{ opacity: [0, 0.9, 0], y: [-4, -14], scale: [0.5, 0.9, 0.5] }}
-                        transition={{ repeat: Infinity, duration: 2.5, delay: 1.1, ease: 'easeOut' }}
-                        className="absolute bottom-1 left-1/3 text-teal-500 dark:text-teal-300 pointer-events-none"
-                      >
-                        <Sparkles className="w-3 h-3" />
-                      </motion.div>
-
-                      {/* Center Glossy Badge */}
-                      <motion.div
-                        initial={{ scale: 0, rotate: -25 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        transition={{ type: 'spring', damping: 14, stiffness: 220 }}
-                        className="relative z-10 p-1.5 rounded-full bg-emerald-500/15 dark:bg-emerald-400/15 ring-4 ring-emerald-500/25 backdrop-blur-xs"
-                      >
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/35">
-                          <motion.div
-                            initial={{ scale: 0.5, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: 0.15, duration: 0.25 }}
-                          >
-                            <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />
-                          </motion.div>
+                        <div className="w-13 h-13 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center shadow-[0_8px_20px_-4px_rgba(16,185,129,0.4)]">
+                          <CheckCircle2 className="w-7 h-7 stroke-[2.4]" />
                         </div>
                       </motion.div>
                     </div>
@@ -449,47 +425,31 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
 
                   {/* YELLOW/AMBER ANIMATION FOR PENDING / UNDER REVIEW */}
                   {isPending && (
-                    <div className="relative h-24 flex items-center justify-center overflow-visible">
+                    <div className="relative h-20 flex items-center justify-center overflow-visible">
                       {/* Ambient warm golden glow */}
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: [0.4, 0.65, 0.4], scale: [0.95, 1.05, 0.95] }}
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: [0.35, 0.55, 0.35], scale: [0.95, 1.05, 0.95] }}
                         transition={{ repeat: Infinity, duration: 2.8, ease: 'easeInOut' }}
-                        className="absolute w-28 h-28 rounded-full bg-amber-500/20 dark:bg-amber-400/20 blur-xl pointer-events-none"
+                        className="absolute w-24 h-24 rounded-full bg-amber-500/20 dark:bg-amber-400/20 blur-lg pointer-events-none"
                       />
 
-                      {/* Orbiting Satellite Particle & Track */}
-                      <div className="absolute w-22 h-22 rounded-full border border-amber-500/25 dark:border-amber-400/25">
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ repeat: Infinity, duration: 4.5, ease: 'linear' }}
-                          className="w-full h-full relative"
-                        >
-                          <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 rounded-full bg-amber-500 dark:bg-amber-400 shadow-sm shadow-amber-500" />
-                        </motion.div>
-                      </div>
-
-                      {/* Concentric rotating counter-ring */}
+                      {/* Smooth breathing accent ring */}
                       <motion.div
-                        animate={{ rotate: -360 }}
-                        transition={{ repeat: Infinity, duration: 9, ease: 'linear' }}
-                        className="absolute w-20 h-20 rounded-full border border-amber-500/15 border-dotted pointer-events-none"
+                        animate={{ scale: [1, 1.12, 1], opacity: [0.5, 0.15, 0.5] }}
+                        transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
+                        className="absolute w-18 h-18 rounded-full border border-amber-500/30 dark:border-amber-400/30 pointer-events-none"
                       />
 
-                      {/* Center Golden Badge */}
+                      {/* Center Sleek Amber Glass Badge */}
                       <motion.div
-                        initial={{ scale: 0, rotate: 20 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        transition={{ type: 'spring', damping: 14, stiffness: 220 }}
-                        className="relative z-10 p-1.5 rounded-full bg-amber-500/15 dark:bg-amber-400/15 ring-4 ring-amber-500/25 backdrop-blur-xs"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: 'spring', damping: 16, stiffness: 260 }}
+                        className="relative z-10 p-1 rounded-full bg-amber-500/15 dark:bg-amber-400/15 ring-2 ring-amber-500/30 backdrop-blur-xs"
                       >
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/35">
-                          <motion.div
-                            animate={{ rotate: [0, 8, 0, -8, 0] }}
-                            transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
-                          >
-                            <Clock className="w-7 h-7 stroke-[2.5]" />
-                          </motion.div>
+                        <div className="w-13 h-13 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shadow-[0_8px_20px_-4px_rgba(245,158,11,0.4)]">
+                          <Clock className="w-6 h-6 stroke-[2.4]" />
                         </div>
                       </motion.div>
                     </div>
@@ -497,38 +457,31 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
 
                   {/* RED ANIMATION FOR DECLINED / REJECTED */}
                   {isRejected && (
-                    <div className="relative h-24 flex items-center justify-center overflow-visible">
+                    <div className="relative h-20 flex items-center justify-center overflow-visible">
                       {/* Ambient rose alert glow */}
                       <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: [0.35, 0.6, 0.35], scale: [0.95, 1.06, 0.95] }}
+                        initial={{ opacity: 0, scale: 0.85 }}
+                        animate={{ opacity: [0.35, 0.55, 0.35], scale: [0.95, 1.05, 0.95] }}
                         transition={{ repeat: Infinity, duration: 2.4, ease: 'easeInOut' }}
-                        className="absolute w-28 h-28 rounded-full bg-rose-500/20 dark:bg-rose-400/20 blur-xl pointer-events-none"
+                        className="absolute w-24 h-24 rounded-full bg-rose-500/20 dark:bg-rose-400/20 blur-lg pointer-events-none"
                       />
 
-                      {/* Concentric warning ripple rings (bounded) */}
+                      {/* Smooth breathing warning ring */}
                       <motion.div
-                        initial={{ scale: 0.85, opacity: 0.4 }}
-                        animate={{ scale: [0.85, 1.15, 0.85], opacity: [0.4, 0.1, 0.4] }}
+                        animate={{ scale: [1, 1.12, 1], opacity: [0.5, 0.15, 0.5] }}
                         transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
-                        className="absolute w-22 h-22 rounded-full border border-rose-500/30 pointer-events-none"
+                        className="absolute w-18 h-18 rounded-full border border-rose-500/30 pointer-events-none"
                       />
 
-                      {/* Center Coral Red Badge */}
+                      {/* Center Sleek Coral Red Glass Badge */}
                       <motion.div
-                        initial={{ scale: 0, rotate: 15 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        transition={{ type: 'spring', damping: 14, stiffness: 220 }}
-                        className="relative z-10 p-1.5 rounded-full bg-rose-500/15 dark:bg-rose-400/15 ring-4 ring-rose-500/25 backdrop-blur-xs"
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: 'spring', damping: 16, stiffness: 260 }}
+                        className="relative z-10 p-1 rounded-full bg-rose-500/15 dark:bg-rose-400/15 ring-2 ring-rose-500/30 backdrop-blur-xs"
                       >
-                        <div className="w-14 h-14 rounded-full bg-gradient-to-br from-rose-500 to-red-600 text-white flex items-center justify-center shadow-lg shadow-rose-500/35">
-                          <motion.div
-                            initial={{ scale: 0.5, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ delay: 0.15, duration: 0.25 }}
-                          >
-                            <XCircle className="w-8 h-8 stroke-[2.5]" />
-                          </motion.div>
+                        <div className="w-13 h-13 rounded-full bg-gradient-to-br from-rose-500 to-red-600 text-white flex items-center justify-center shadow-[0_8px_20px_-4px_rgba(244,63,94,0.4)]">
+                          <XCircle className="w-7 h-7 stroke-[2.4]" />
                         </div>
                       </motion.div>
                     </div>
@@ -538,13 +491,13 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                   <div className="space-y-1.5">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold tracking-wide">
                       {isApproved && (
-                        <span className="text-emerald-700 dark:text-emerald-400 font-extrabold text-sm sm:text-base flex items-center gap-1.5 bg-emerald-500/10 dark:bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-500/20">
-                          <Sparkles className="w-4 h-4 text-emerald-500" />
+                        <span className="text-emerald-700 dark:text-emerald-300 font-extrabold text-sm sm:text-base flex items-center gap-2 bg-emerald-500/10 dark:bg-emerald-400/10 px-3.5 py-1 rounded-full border border-emerald-500/20 shadow-xs">
+                          <Sparkles className="w-4 h-4 text-emerald-500 animate-pulse" />
                           {isAmharic ? 'ተረጋግጧል (የነቃ)' : 'Approved & Active'}
                         </span>
                       )}
                       {isPending && (
-                        <span className="text-amber-700 dark:text-amber-400 font-extrabold text-sm sm:text-base flex items-center gap-1.5 bg-amber-500/10 dark:bg-amber-400/10 px-3 py-1 rounded-full border border-amber-500/20">
+                        <span className="text-amber-700 dark:text-amber-300 font-extrabold text-sm sm:text-base flex items-center gap-2 bg-amber-500/10 dark:bg-amber-400/10 px-3.5 py-1 rounded-full border border-amber-500/20 shadow-xs">
                           <span className="relative flex h-2 w-2">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
                             <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
@@ -553,7 +506,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                         </span>
                       )}
                       {isRejected && (
-                        <span className="text-rose-700 dark:text-rose-400 font-extrabold text-sm sm:text-base flex items-center gap-1.5 bg-rose-500/10 dark:bg-rose-400/10 px-3 py-1 rounded-full border border-rose-500/20">
+                        <span className="text-rose-700 dark:text-rose-300 font-extrabold text-sm sm:text-base flex items-center gap-2 bg-rose-500/10 dark:bg-rose-400/10 px-3.5 py-1 rounded-full border border-rose-500/20 shadow-xs">
                           <AlertCircle className="w-4 h-4 text-rose-500" />
                           {isAmharic ? 'ውድቅ ተደርጓል (Declined)' : 'Verification Declined'}
                         </span>
@@ -576,11 +529,11 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                   </div>
                 </div>
 
-                {/* =================== CLEAR CONCISE INFO CARD =================== */}
-                <div className="rounded-2xl bg-zinc-50 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 p-3.5 space-y-2.5 shadow-2xs">
+                {/* =================== SLEEK & COMPACT INFO CARD =================== */}
+                <div className="rounded-2xl bg-zinc-50/90 dark:bg-zinc-900/90 border border-zinc-200/80 dark:border-zinc-800 p-3.5 space-y-2.5 shadow-xs">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {/* Phone */}
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 space-y-0.5">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800/80 space-y-0.5 shadow-2xs">
                       <div className="flex items-center gap-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                         <Smartphone className="w-3 h-3" />
                         <span>{isAmharic ? 'ስልክ' : 'Phone'}</span>
@@ -591,7 +544,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                     </div>
 
                     {/* Plan */}
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 space-y-0.5">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800/80 space-y-0.5 shadow-2xs">
                       <div className="flex items-center gap-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                         <CreditCard className="w-3 h-3" />
                         <span>{isAmharic ? 'እቅድ' : 'Plan'}</span>
@@ -602,7 +555,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                     </div>
 
                     {/* Subscriber */}
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 space-y-0.5">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800/80 space-y-0.5 shadow-2xs">
                       <div className="flex items-center gap-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                         <User className="w-3 h-3" />
                         <span>{isAmharic ? 'ስም' : 'Name'}</span>
@@ -613,7 +566,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                     </div>
 
                     {/* Date */}
-                    <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 space-y-0.5">
+                    <div className="p-2.5 rounded-xl bg-white dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800/80 space-y-0.5 shadow-2xs">
                       <div className="flex items-center gap-1 text-[10px] font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
                         <Calendar className="w-3 h-3" />
                         <span>{isAmharic ? 'ቀን' : 'Date'}</span>
@@ -626,11 +579,11 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
 
                   {/* Screenshot Preview Button if exists */}
                   {activeSubmission.screenshotUrl && (
-                    <div className="pt-1">
+                    <div className="pt-0.5">
                       <button
                         type="button"
                         onClick={() => setIsPreviewImageOpen(true)}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-200/60 dark:border-zinc-800/60 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white dark:bg-zinc-950/60 border border-zinc-200/60 dark:border-zinc-800/80 hover:bg-zinc-100 dark:hover:bg-zinc-800/60 text-xs font-semibold text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer shadow-2xs"
                       >
                         <span className="inline-flex items-center gap-1.5">
                           <Eye className="w-3.5 h-3.5 text-zinc-500" />
@@ -648,7 +601,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                     <Button
                       size="md"
                       onClick={handleResubmitAction}
-                      className="w-full font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white h-10 rounded-xl shadow-xs cursor-pointer"
+                      className="w-full font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white h-10 rounded-xl shadow-sm cursor-pointer"
                     >
                       {isAmharic ? 'አዲስ ደረሰኝ ላክ (Resubmit)' : 'Resubmit Payment Receipt'}
                     </Button>
@@ -656,13 +609,13 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                     <Button
                       size="md"
                       onClick={onClose}
-                      className="w-full font-bold text-xs bg-zinc-900 hover:bg-zinc-800 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-900 h-10 rounded-xl shadow-xs cursor-pointer"
+                      className="w-full font-bold text-xs bg-zinc-950 hover:bg-zinc-900 text-white dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-950 h-10 rounded-xl shadow-sm cursor-pointer"
                     >
                       {isAmharic ? 'እሺ (ተጠናቋል)' : 'Done'}
                     </Button>
                   )}
 
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="flex items-center justify-between pt-1 px-1">
                     {/* Refresh button */}
                     <button
                       type="button"
@@ -671,7 +624,7 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
                       className="inline-flex items-center gap-1 text-[11px] font-semibold text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors cursor-pointer"
                     >
                       <RefreshCw className={`w-3 h-3 ${isSearching ? 'animate-spin' : ''}`} />
-                      {isAmharic ? 'ሁኔታ አድስ' : 'Refresh'}
+                      {isAmharic ? 'ሁኔታ አድስ' : 'Refresh Status'}
                     </button>
 
                     {/* Search another phone */}
