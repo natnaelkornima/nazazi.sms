@@ -54,44 +54,87 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
   const [showSuccessView, setShowSuccessView] = useState<boolean>(Boolean(initialSubmission));
 
   // Perform live lookup with fallback and timeout resilience
-  const performLookup = useCallback(async (phone: string) => {
-    const trimmed = phone.trim();
-    if (!trimmed) return;
+  const performLookup = useCallback(
+    async (phone: string) => {
+      const trimmed = phone.trim();
+      if (!trimmed) {
+        setPhoneSearchError(isAmharic ? 'እባክዎ የስልክ ቁጥር ያስገቡ' : 'Please enter a phone number');
+        return;
+      }
 
-    const validation = validateEthiopianPhone(trimmed, isAmharic);
-    if (!validation.isValid) {
-      setPhoneSearchError(validation.error);
+      const validation = validateEthiopianPhone(trimmed, isAmharic);
+      if (!validation.isValid) {
+        setPhoneSearchError(validation.error);
+        return;
+      }
+
+      setPhoneSearchError(null);
+      setIsSearching(true);
+      setShowSuccessView(false);
+
+      try {
+        // 1. Optimistic fast lookup from context state
+        const localMatch = getSubmissionByPhone(trimmed);
+        if (localMatch) {
+          setActiveSubmission(localMatch);
+        }
+
+        // 2. Fetch fresh real-time status from server
+        const result = await checkStatusLive(trimmed);
+        if (result) {
+          setActiveSubmission(result);
+        } else if (localMatch) {
+          setActiveSubmission(localMatch);
+        } else {
+          // 3. Check localStorage directly as fallback
+          let foundInStorage: PaymentSubmission | null = null;
+          if (typeof window !== 'undefined') {
+            try {
+              const saved = localStorage.getItem('nazazi_payment_submissions');
+              if (saved) {
+                const list = JSON.parse(saved);
+                if (Array.isArray(list)) {
+                  foundInStorage =
+                    list.find((s: PaymentSubmission) => {
+                      const cleanA = s.userPhone?.replace(/\D/g, '') || '';
+                      const cleanB = trimmed.replace(/\D/g, '') || '';
+                      return (
+                        cleanA === cleanB ||
+                        (cleanA.length >= 8 && cleanB.length >= 8 && cleanA.slice(-8) === cleanB.slice(-8))
+                      );
+                    }) || null;
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+
+          if (foundInStorage) {
+            setActiveSubmission(foundInStorage);
+          } else {
+            setActiveSubmission(null);
+          }
+        }
+      } catch (lookupErr) {
+        console.warn('Status lookup notice:', lookupErr);
+        const fallback = getSubmissionByPhone(trimmed) || null;
+        setActiveSubmission(fallback);
+      } finally {
+        setIsSearching(false);
+        setHasSearched(true);
+      }
+    },
+    [checkStatusLive, getSubmissionByPhone, isAmharic]
+  );
+
+  // Initialize or reset ONLY when modal opens or initial props change
+  useEffect(() => {
+    if (!isOpen) {
+      setIsSearching(false);
       return;
     }
-    setPhoneSearchError(null);
-    setIsSearching(true);
 
-    try {
-      // 1. Optimistic fast lookup from state
-      const localMatch = getSubmissionByPhone(trimmed);
-      if (localMatch) {
-        setActiveSubmission(localMatch);
-      }
-
-      // 2. Fetch fresh real-time status from server
-      const result = await checkStatusLive(trimmed);
-      if (result) {
-        setActiveSubmission(result);
-      } else if (localMatch) {
-        setActiveSubmission(localMatch);
-      } else {
-        setActiveSubmission(null);
-      }
-    } catch {
-      setActiveSubmission(getSubmissionByPhone(trimmed) || null);
-    } finally {
-      setIsSearching(false);
-      setHasSearched(true);
-      setShowSuccessView(false);
-    }
-  }, [checkStatusLive, getSubmissionByPhone, isAmharic]);
-
-  useEffect(() => {
     if (initialSubmission) {
       setActiveSubmission(initialSubmission);
       setShowSuccessView(true);
@@ -101,14 +144,13 @@ export const SubscriptionStatusModal: React.FC<SubscriptionStatusModalProps> = (
     } else if (initialPhone) {
       setPhoneInput(initialPhone);
       setPhoneSearchError(null);
+      setShowSuccessView(false);
       performLookup(initialPhone);
     } else {
-      setActiveSubmission(null);
       setShowSuccessView(false);
-      setHasSearched(false);
       setPhoneSearchError(null);
     }
-  }, [initialSubmission, initialPhone, isOpen, performLookup]);
+  }, [isOpen, initialSubmission, initialPhone, performLookup]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

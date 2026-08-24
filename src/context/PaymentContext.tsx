@@ -58,19 +58,7 @@ function getAdminAuthHeaders(): Record<string, string> {
 }
 
 export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [submissions, setSubmissions] = useState<PaymentSubmission[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('nazazi_payment_submissions');
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          return [];
-        }
-      }
-    }
-    return [];
-  });
+  const [submissions, setSubmissions] = useState<PaymentSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPlanForCheckout, setSelectedPlanForCheckout] = useState<string | null>(null);
   const [connectionInfo, setConnectionInfo] = useState<DatabaseConnectionInfo>({
@@ -79,6 +67,20 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     isCloudinaryConfigured: false,
     dbError: null,
   });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('nazazi_payment_submissions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSubmissions(parsed);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const mapRecordToSubmission = (record: {
     id: string;
@@ -460,24 +462,29 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const getSubmissionByPhone = (phone: string): PaymentSubmission | undefined => {
+  const getSubmissionByPhone = useCallback((phone: string): PaymentSubmission | undefined => {
     if (!phone) return undefined;
     return submissions.find((sub) => phoneMatches(sub.userPhone, phone));
-  };
+  }, [submissions]);
 
   /**
    * Live lookup directly against /api/registrations?phone=...
    * Ensures production users instantly get their real status (approved, pending, rejected)
    */
-  const checkStatusLive = async (phone: string): Promise<PaymentSubmission | null> => {
+  const checkStatusLive = useCallback(async (phone: string): Promise<PaymentSubmission | null> => {
     const raw = (phone || '').trim();
     if (!raw) return null;
 
     try {
       const lookupPhone = canonicalPhone(raw) || raw;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 4500);
+
       const res = await fetch(`/api/registrations?phone=${encodeURIComponent(lookupPhone)}`, {
         cache: 'no-store',
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (res.ok) {
         const data = await res.json();
@@ -491,7 +498,11 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
             );
             const updated = [freshSub, ...filtered];
             if (typeof window !== 'undefined') {
-              localStorage.setItem('nazazi_payment_submissions', JSON.stringify(updated));
+              try {
+                localStorage.setItem('nazazi_payment_submissions', JSON.stringify(updated));
+              } catch {
+                // ignore
+              }
             }
             return updated;
           });
@@ -504,8 +515,8 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
 
     // Fallback to local memory / local storage
-    return getSubmissionByPhone(raw) || null;
-  };
+    return submissions.find((sub) => phoneMatches(sub.userPhone, raw)) || null;
+  }, [submissions]);
 
   return (
     <PaymentContext.Provider

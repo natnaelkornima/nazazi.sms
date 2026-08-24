@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { NavigationTab } from './types';
+import { NavigationTab, PaymentSubmission } from './types';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider } from './context/AuthContext';
@@ -17,6 +17,7 @@ import { SubscriptionStatusModal } from './components/SubscriptionStatusModal';
 function MainApp() {
   const [activeTab, setActiveTab] = useState<NavigationTab>('landing');
   const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
+  const [verifySubmission, setVerifySubmission] = useState<PaymentSubmission | null>(null);
 
   const handleNavigate = (tab: NavigationTab) => {
     if (tab === '404' || tab === '500') {
@@ -29,6 +30,16 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleOpenVerifyModal = (sub?: PaymentSubmission | null) => {
+    setVerifySubmission(sub || null);
+    setIsVerifyModalOpen(true);
+  };
+
+  const handleCloseVerifyModal = () => {
+    setIsVerifyModalOpen(false);
+    setVerifySubmission(null);
+  };
+
   return (
     <div className="min-h-screen bg-white dark:bg-[#09090B] text-zinc-900 dark:text-zinc-50 font-sans transition-colors duration-200 selection:bg-zinc-900 selection:text-zinc-50 dark:selection:bg-zinc-100 dark:selection:text-zinc-900 flex flex-col justify-between">
       <div>
@@ -37,7 +48,7 @@ function MainApp() {
           <Navbar
             activeTab={activeTab}
             onNavigate={handleNavigate}
-            onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
+            onOpenVerifyModal={() => handleOpenVerifyModal(null)}
           />
         )}
 
@@ -46,7 +57,7 @@ function MainApp() {
           {activeTab === 'landing' && (
             <LandingView
               onNavigate={handleNavigate}
-              onOpenVerifyModal={() => setIsVerifyModalOpen(true)}
+              onOpenVerifyModal={(sub) => handleOpenVerifyModal(sub)}
             />
           )}
           {activeTab === 'admin' && (
@@ -61,13 +72,14 @@ function MainApp() {
 
       {/* Footer - Rendered only on user-facing pages, hidden in Admin Console */}
       {activeTab !== 'admin' && (
-        <Footer onNavigate={handleNavigate} onOpenVerifyModal={() => setIsVerifyModalOpen(true)} />
+        <Footer onNavigate={handleNavigate} onOpenVerifyModal={() => handleOpenVerifyModal(null)} />
       )}
 
       {/* Global Phone Approval Status Popup Modal */}
       <SubscriptionStatusModal
         isOpen={isVerifyModalOpen}
-        onClose={() => setIsVerifyModalOpen(false)}
+        onClose={handleCloseVerifyModal}
+        submission={verifySubmission}
       />
     </div>
   );

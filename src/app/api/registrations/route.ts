@@ -56,6 +56,7 @@ export async function GET(req: NextRequest) {
         id: record.id,
         name: record.name,
         phone_number: record.phone_number,
+        payment_image_url: record.payment_image_url,
         plan_name: record.plan_name,
         amount: record.amount,
         status: record.status || 'pending',

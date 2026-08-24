@@ -13,14 +13,18 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [theme, setThemeState] = useState<Theme>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('nazazi-theme');
-      if (saved === 'dark' || saved === 'light') return saved;
-    }
-    return 'light'; // Default to pristine light mode per requirements
-  });
+  const [theme, setThemeState] = useState<Theme>('light');
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('nazazi-theme');
+      if (saved === 'dark' || saved === 'light') {
+        setThemeState(saved);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -29,7 +33,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } else {
       root.classList.remove('dark');
     }
-    localStorage.setItem('nazazi-theme', theme);
+    try {
+      localStorage.setItem('nazazi-theme', theme);
+    } catch {
+      // ignore
+    }
   }, [theme]);
 
   const toggleTheme = () => {

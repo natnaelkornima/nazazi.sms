@@ -20,7 +20,7 @@ import {
 
 interface LandingViewProps {
   onNavigate: (tab: NavigationTab) => void;
-  onOpenVerifyModal?: () => void;
+  onOpenVerifyModal?: (submission?: PaymentSubmission | null) => void;
   isVerifyModalOpen?: boolean;
   onCloseVerifyModal?: () => void;
 }
@@ -39,7 +39,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const [isSubscribeModalOpen, setIsSubscribeModalOpen] = useState(false);
   const [selectedPlanForSubscribe, setSelectedPlanForSubscribe] = useState<string>('');
 
-  // Internal verify status modal state if opened locally
+  // Internal verify status modal state if opened locally without parent prop
   const [localVerifyModalOpen, setLocalVerifyModalOpen] = useState(false);
   const [verifySubmission, setVerifySubmission] = useState<PaymentSubmission | null>(null);
 
@@ -61,11 +61,11 @@ export const LandingView: React.FC<LandingViewProps> = ({
     }
   };
 
-  const handleTriggerVerifyModal = () => {
-    setVerifySubmission(null);
+  const handleTriggerVerifyModal = (sub?: PaymentSubmission | null) => {
     if (onOpenVerifyModal) {
-      onOpenVerifyModal();
+      onOpenVerifyModal(sub || null);
     } else {
+      setVerifySubmission(sub || null);
       setLocalVerifyModalOpen(true);
     }
   };
@@ -294,7 +294,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
             {/* Clean Frosted Pill Secondary Button */}
             <button
-              onClick={handleTriggerVerifyModal}
+              onClick={() => handleTriggerVerifyModal()}
               className="w-full sm:w-auto px-7 py-3.5 rounded-full font-bold text-sm text-zinc-800 dark:text-zinc-200 bg-white/90 dark:bg-zinc-900/90 hover:bg-zinc-100 dark:hover:bg-zinc-800/90 border border-zinc-200/90 dark:border-zinc-700/80 shadow-xs hover:shadow-md transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
             >
               <Smartphone className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
@@ -518,7 +518,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
             <Button
               size="lg"
               variant="outline"
-              onClick={handleTriggerVerifyModal}
+              onClick={() => handleTriggerVerifyModal(null)}
               className="w-full sm:w-auto border-zinc-700 dark:border-zinc-300 text-zinc-200 dark:text-zinc-800 font-bold"
             >
               {isAmharic ? 'የአባልነት ማረጋገጫ በስልክ ቁጥር' : 'Verify Approval Status'}
@@ -533,18 +533,24 @@ export const LandingView: React.FC<LandingViewProps> = ({
         onClose={() => setIsSubscribeModalOpen(false)}
         initialPlan={selectedPlanForSubscribe}
         onSuccess={(sub) => {
-          setVerifySubmission(sub);
-          setLocalVerifyModalOpen(true);
+          if (onOpenVerifyModal) {
+            onOpenVerifyModal(sub);
+          } else {
+            setVerifySubmission(sub);
+            setLocalVerifyModalOpen(true);
+          }
         }}
       />
 
-      {/* Phone Number Verification Status Popup Modal */}
-      <SubscriptionStatusModal
-        isOpen={activeVerifyOpen}
-        onClose={handleCloseVerify}
-        submission={verifySubmission}
-        onResubmit={() => setIsSubscribeModalOpen(true)}
-      />
+      {/* Phone Number Verification Status Popup Modal (Fallback for isolated renders) */}
+      {!onOpenVerifyModal && (
+        <SubscriptionStatusModal
+          isOpen={localVerifyModalOpen}
+          onClose={handleCloseVerify}
+          submission={verifySubmission}
+          onResubmit={() => setIsSubscribeModalOpen(true)}
+        />
+      )}
     </div>
   );
 };

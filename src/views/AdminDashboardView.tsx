@@ -1527,7 +1527,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      approvePayment(sub.id);
+                                      approvePayment(sub.id, sub.userPhone);
                                       success('Approved!', `Activated SMS subscription for ${sub.userPhone}`);
                                     }}
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-600 transition-all cursor-pointer"
@@ -1539,7 +1539,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      rejectPayment(sub.id);
+                                      rejectPayment(sub.id, sub.userPhone);
                                       info('Rejected', `Marked ${sub.userPhone} as rejected`);
                                     }}
                                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-500 hover:text-white dark:hover:bg-rose-600 transition-all cursor-pointer"
@@ -2011,7 +2011,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                   <button
                     type="button"
                     onClick={() => {
-                      rejectPayment(previewSubmission.id);
+                      rejectPayment(previewSubmission.id, previewSubmission.userPhone);
                       info('Rejected', 'Marked transaction as rejected');
                       setPreviewSubmission(null);
                     }}
@@ -2025,7 +2025,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                   <button
                     type="button"
                     onClick={() => {
-                      approvePayment(previewSubmission.id);
+                      approvePayment(previewSubmission.id, previewSubmission.userPhone);
                       success('Approved', `Activated for ${previewSubmission.userName}`);
                       setPreviewSubmission(null);
                     }}

@@ -269,14 +269,18 @@ interface LanguageContextType {
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
 export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [language, setLanguageState] = useState<Language>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('nazazi-lang');
-      if (saved === 'am' || saved === 'en') return saved;
-    }
-    return 'am';
-  });
+  const [language, setLanguageState] = useState<Language>('am');
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('nazazi-lang');
+      if (saved === 'am' || saved === 'en') {
+        setLanguageState(saved);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     const root = document.documentElement;
@@ -288,7 +292,11 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       root.classList.remove('lang-am');
       document.body.classList.remove('lang-am');
     }
-    localStorage.setItem('nazazi-lang', language);
+    try {
+      localStorage.setItem('nazazi-lang', language);
+    } catch {
+      // ignore
+    }
   }, [language]);
 
   const toggleLanguage = () => {

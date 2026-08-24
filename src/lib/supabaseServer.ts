@@ -213,9 +213,36 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
     amountVal = cachedPlan.amount;
   }
 
-  const rawStatus = String(row.status || 'pending').toLowerCase();
-  const status: 'pending' | 'approved' | 'rejected' =
-    rawStatus === 'approved' || rawStatus === 'rejected' ? (rawStatus as 'approved' | 'rejected') : 'pending';
+  let rawStatus = String(
+    row.status || row.state || row.subscription_status || row.payment_status || ''
+  ).toLowerCase().trim();
+
+  let status: 'pending' | 'approved' | 'rejected' = 'pending';
+
+  if (
+    rawStatus === 'approved' ||
+    rawStatus === 'active' ||
+    rawStatus === 'verified' ||
+    rawStatus === 'completed' ||
+    row.is_approved === true ||
+    row.approved === true ||
+    row.is_verified === true ||
+    row.verified === true
+  ) {
+    status = 'approved';
+  } else if (
+    rawStatus === 'rejected' ||
+    rawStatus === 'declined' ||
+    rawStatus === 'denied' ||
+    rawStatus === 'canceled' ||
+    rawStatus === 'cancelled' ||
+    row.is_rejected === true ||
+    row.rejected === true
+  ) {
+    status = 'rejected';
+  } else {
+    status = 'pending';
+  }
 
   return {
     id: idStr,
@@ -546,105 +573,141 @@ export async function getRegistrationByPhone(phone: string): Promise<Registratio
   const cleanDigits = rawInput.replace(/\D/g, '');
   const last8 = cleanDigits.slice(-8);
 
-  const overrideKey =
-    statusOverridesMap.get(rawInput) ||
-    statusOverridesMap.get(canonical) ||
-    (cleanDigits ? statusOverridesMap.get(cleanDigits) : undefined) ||
-    (last8 ? statusOverridesMap.get(last8) : undefined);
+  const getCachedOverride = (id?: string, phoneNum?: string) => {
+    const pClean = (phoneNum || '').replace(/\D/g, '');
+    const pLast8 = pClean.slice(-8);
+    const pNorm = canonicalPhone(phoneNum || '');
 
+    return (
+      (id ? statusOverridesMap.get(id) : undefined) ||
+      (phoneNum ? statusOverridesMap.get(phoneNum) : undefined) ||
+      (pNorm ? statusOverridesMap.get(pNorm) : undefined) ||
+      (pClean ? statusOverridesMap.get(pClean) : undefined) ||
+      (pLast8 && pLast8.length >= 7 ? statusOverridesMap.get(pLast8) : undefined) ||
+      (pLast8 && pLast8.length >= 7 ? statusOverridesMap.get(`09${pLast8}`) : undefined) ||
+      (pLast8 && pLast8.length >= 7 ? statusOverridesMap.get(`07${pLast8}`) : undefined) ||
+      (pLast8 && pLast8.length >= 7 ? statusOverridesMap.get(`+2519${pLast8}`) : undefined) ||
+      (pLast8 && pLast8.length >= 7 ? statusOverridesMap.get(`2519${pLast8}`) : undefined) ||
+      statusOverridesMap.get(rawInput) ||
+      statusOverridesMap.get(canonical) ||
+      (cleanDigits ? statusOverridesMap.get(cleanDigits) : undefined) ||
+      (last8 ? statusOverridesMap.get(last8) : undefined)
+    );
+  };
+
+  // 1. Fast in-memory check (instant response for current runtime)
+  const localMatch = inMemoryRegistrations.find((r) => phoneMatches(r.phone_number, rawInput));
+  if (localMatch) {
+    const override = getCachedOverride(localMatch.id, localMatch.phone_number);
+    let finalStatus = localMatch.status || 'pending';
+    if (override?.status === 'approved' || override?.status === 'rejected') {
+      finalStatus = override.status;
+    }
+    return {
+      ...localMatch,
+      status: finalStatus,
+      reviewed_at: override?.reviewed_at || localMatch.reviewed_at || null,
+    };
+  }
+
+  // 2. Query Supabase with a strict 2-second timeout to prevent UI hanging
   const client = getSupabaseClient();
   if (client) {
-    const candidateTables = ['registrations', 'payments', 'subscriptions'];
+    try {
+      const candidateTables = detectedTableCache?.tableName
+        ? [detectedTableCache.tableName, 'registrations', 'payments', 'subscriptions']
+        : ['registrations', 'payments', 'subscriptions', 'subscribers', 'users'];
 
-    for (const tableName of candidateTables) {
-      try {
-        let matchedData: Record<string, unknown> | null = null;
+      const queryPromise = (async (): Promise<RegistrationRecord | null> => {
+        for (const tableName of candidateTables) {
+          try {
+            let matchedData: Record<string, unknown> | null = null;
 
-        if (last8 && last8.length >= 7) {
-          for (const colName of ['phone_number', 'phone', 'user_phone', 'mobile']) {
-            const { data, error } = await client
-              .from(tableName)
-              .select('*')
-              .ilike(colName, `%${last8}%`)
-              .order('created_at', { ascending: false })
-              .limit(1)
-              .maybeSingle();
+            if (last8 && last8.length >= 7) {
+              for (const colName of ['phone_number', 'phone', 'user_phone', 'mobile']) {
+                try {
+                  const { data, error } = await client
+                    .from(tableName)
+                    .select('*')
+                    .ilike(colName, `%${last8}%`)
+                    .limit(1)
+                    .maybeSingle();
 
-            if (!error && data) {
-              matchedData = data as Record<string, unknown>;
-              break;
+                  if (!error && data) {
+                    matchedData = data as Record<string, unknown>;
+                    break;
+                  }
+                } catch {
+                  // try next column
+                }
+              }
             }
-          }
-        }
 
-        if (!matchedData) {
-          const { data: recentRows, error: listErr } = await client
-            .from(tableName)
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(100);
+            if (!matchedData) {
+              const { data: recentRows, error: orderErr } = await client
+                .from(tableName)
+                .select('*')
+                .limit(50);
 
-          if (!listErr && Array.isArray(recentRows)) {
-            const found = recentRows.find((row: Record<string, unknown>) => {
-              const rowPhone = String(row.phone_number || row.phone || row.user_phone || row.mobile || '');
-              return phoneMatches(rowPhone, rawInput);
-            });
-            if (found) {
-              matchedData = found as Record<string, unknown>;
+              if (!orderErr && Array.isArray(recentRows) && recentRows.length > 0) {
+                const found = recentRows.find((row) => {
+                  const r = row as Record<string, unknown>;
+                  const rowPhone = String(r.phone_number || r.phone || r.user_phone || r.mobile || '');
+                  return phoneMatches(rowPhone, rawInput);
+                });
+                if (found) {
+                  matchedData = found as Record<string, unknown>;
+                }
+              }
             }
+
+            if (matchedData) {
+              const parsed = extractRowData(matchedData);
+              const override = getCachedOverride(parsed.id, parsed.phone_number);
+
+              let finalStatus = parsed.status;
+              if (override?.status === 'approved' || override?.status === 'rejected') {
+                finalStatus = override.status;
+              }
+
+              const resultRecord: RegistrationRecord = {
+                ...parsed,
+                status: finalStatus,
+                reviewed_at: override?.reviewed_at || parsed.reviewed_at || null,
+              };
+
+              // Cache in memory for subsequent instant lookups
+              if (!inMemoryRegistrations.some((r) => r.id === resultRecord.id)) {
+                inMemoryRegistrations = [resultRecord, ...inMemoryRegistrations];
+              }
+
+              return resultRecord;
+            }
+          } catch {
+            // Next table
           }
         }
+        return null;
+      })();
 
-        if (matchedData) {
-          const parsed = extractRowData(matchedData);
-          const phoneStr = parsed.phone_number;
-          const normalized = canonicalPhone(phoneStr);
-          const rowLast8 = phoneStr.replace(/\D/g, '').slice(-8);
-
-          const cachedOverride =
-            statusOverridesMap.get(parsed.id) ||
-            statusOverridesMap.get(phoneStr) ||
-            statusOverridesMap.get(normalized) ||
-            (rowLast8 ? statusOverridesMap.get(rowLast8) : undefined) ||
-            overrideKey;
-
-          let finalStatus = parsed.status;
-          if (cachedOverride?.status === 'approved' || cachedOverride?.status === 'rejected') {
-            finalStatus = cachedOverride.status;
-          }
-
-          return {
-            ...parsed,
-            status: finalStatus,
-            reviewed_at: parsed.reviewed_at || cachedOverride?.reviewed_at || null,
-          };
-        }
-      } catch (dbErr) {
-        console.warn(`Supabase lookup warning on ${tableName}:`, dbErr);
+      const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 2200));
+      const supabaseResult = await Promise.race([queryPromise, timeoutPromise]);
+      if (supabaseResult) {
+        return supabaseResult;
       }
+    } catch (err) {
+      console.warn('Supabase getRegistrationByPhone error notice:', err);
     }
   }
 
-  const match = inMemoryRegistrations.find((r) => phoneMatches(r.phone_number, rawInput));
-
-  if (match) {
-    const idStr = match.id;
-    const phoneStr = match.phone_number;
-    const cachedOverride =
-      statusOverridesMap.get(idStr) ||
-      statusOverridesMap.get(phoneStr) ||
-      statusOverridesMap.get(canonicalPhone(phoneStr)) ||
-      overrideKey;
-
-    let finalStatus = match.status;
-    if (cachedOverride?.status) {
-      finalStatus = cachedOverride.status;
-    }
-
+  // 3. Final in-memory re-check
+  const finalMatch = inMemoryRegistrations.find((r) => phoneMatches(r.phone_number, rawInput));
+  if (finalMatch) {
+    const override = getCachedOverride(finalMatch.id, finalMatch.phone_number);
     return {
-      ...match,
-      status: finalStatus,
-      reviewed_at: cachedOverride?.reviewed_at || match.reviewed_at || null,
+      ...finalMatch,
+      status: override?.status || finalMatch.status || 'pending',
+      reviewed_at: override?.reviewed_at || finalMatch.reviewed_at || null,
     };
   }
 
@@ -684,18 +747,46 @@ export async function getAllRegistrations(): Promise<{
 
   for (const tableName of candidateTables) {
     try {
-      const { data, error } = await client
-        .from(tableName)
-        .select('*')
-        .order('created_at', { ascending: false });
+      let data: unknown[] | null = null;
+      let queryError: unknown = null;
 
-      if (error) {
+      try {
+        const res = await client
+          .from(tableName)
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!res.error && res.data) {
+          data = res.data;
+        } else {
+          queryError = res.error;
+        }
+      } catch (err) {
+        queryError = err;
+      }
+
+      if (!data) {
+        try {
+          const resNoOrder = await client.from(tableName).select('*');
+          if (!resNoOrder.error && resNoOrder.data) {
+            data = resNoOrder.data;
+          }
+        } catch {
+          // continue
+        }
+      }
+
+      if (!data || !Array.isArray(data)) {
         continue;
       }
 
-      const list: RegistrationRecord[] = (data || []).map((row: Record<string, unknown>) => {
-        const parsed = extractRowData(row);
-        const cleanPhone = normalizePhoneKey(parsed.phone_number);
+      const list: RegistrationRecord[] = data.map((row: unknown) => {
+        const r = row as Record<string, unknown>;
+        const parsed = extractRowData(r);
+        const phoneStr = parsed.phone_number;
+        const cleanPhone = normalizePhoneKey(phoneStr);
+        const canon = canonicalPhone(phoneStr);
+        const rawDigits = phoneStr.replace(/\D/g, '');
+        const last8 = rawDigits.slice(-8);
 
         // Check if there is an in-memory or cached plan metadata that has authentic amount (e.g. 600 or 1000)
         const memMatch = inMemoryRegistrations.find(
@@ -711,7 +802,12 @@ export async function getAllRegistrations(): Promise<{
 
         const cachedOverride =
           statusOverridesMap.get(parsed.id) ||
-          (cleanPhone ? statusOverridesMap.get(cleanPhone) : undefined);
+          (cleanPhone ? statusOverridesMap.get(cleanPhone) : undefined) ||
+          (canon ? statusOverridesMap.get(canon) : undefined) ||
+          (rawDigits ? statusOverridesMap.get(rawDigits) : undefined) ||
+          (last8 && last8.length >= 7 ? statusOverridesMap.get(last8) : undefined) ||
+          (last8 && last8.length >= 7 ? statusOverridesMap.get(`09${last8}`) : undefined) ||
+          (last8 && last8.length >= 7 ? statusOverridesMap.get(`07${last8}`) : undefined);
 
         let finalStatus = parsed.status;
         if (cachedOverride && (cachedOverride.status === 'approved' || cachedOverride.status === 'rejected')) {
@@ -781,7 +877,18 @@ export async function updateRegistrationPlan(
     return { success: true };
   }
 
-  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+  const candidateTables = [
+    'registrations',
+    'payments',
+    'subscriptions',
+    'subscribers',
+    'users',
+    'registration',
+    'payment',
+    'subscription',
+    'members',
+    'profiles',
+  ];
   const cleanDigits = rawPhone.replace(/\D/g, '');
   const last8 = cleanDigits.slice(-8);
 
@@ -828,20 +935,23 @@ export async function updateRegistrationStatus(
   const cleanDigits = rawPhone.replace(/\D/g, '');
   const last8 = cleanDigits.slice(-8);
 
-  if (id) {
-    statusOverridesMap.set(id, { status, reviewed_at: nowIso });
-  }
-  if (rawPhone) {
-    statusOverridesMap.set(rawPhone, { status, reviewed_at: nowIso });
-  }
-  if (canonical) {
-    statusOverridesMap.set(canonical, { status, reviewed_at: nowIso });
-  }
-  if (cleanDigits) {
-    statusOverridesMap.set(cleanDigits, { status, reviewed_at: nowIso });
-  }
+  const keysToSet = new Set<string>();
+  if (id) keysToSet.add(id);
+  if (rawPhone) keysToSet.add(rawPhone);
+  if (canonical) keysToSet.add(canonical);
+  if (cleanDigits) keysToSet.add(cleanDigits);
   if (last8 && last8.length >= 7) {
-    statusOverridesMap.set(last8, { status, reviewed_at: nowIso });
+    keysToSet.add(last8);
+    keysToSet.add(`09${last8}`);
+    keysToSet.add(`07${last8}`);
+    keysToSet.add(`+2519${last8}`);
+    keysToSet.add(`+2517${last8}`);
+    keysToSet.add(`2519${last8}`);
+    keysToSet.add(`2517${last8}`);
+  }
+
+  for (const k of keysToSet) {
+    statusOverridesMap.set(k, { status, reviewed_at: nowIso });
   }
 
   inMemoryRegistrations = inMemoryRegistrations.map((r) => {
@@ -856,7 +966,18 @@ export async function updateRegistrationStatus(
     return { success: true };
   }
 
-  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+  const candidateTables = [
+    'registrations',
+    'payments',
+    'subscriptions',
+    'subscribers',
+    'users',
+    'registration',
+    'payment',
+    'subscription',
+    'members',
+    'profiles',
+  ];
 
   for (const tableName of candidateTables) {
     try {
