@@ -213,14 +213,14 @@ export const LandingView: React.FC<LandingViewProps> = ({
     ];
 
   return (
-    <div className="space-y-20 sm:space-y-28 pb-24 overflow-hidden">
-      {/* Hero Section Container with subtle grid pattern */}
-      <div className="relative pt-[70px] sm:pt-[90px] bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b40_1px,transparent_1px),linear-gradient(to_bottom,#1e293b40_1px,transparent_1px)] bg-[size:36px_36px]">
+    <div className="space-y-16 sm:space-y-28 lg:space-y-36 pb-20 sm:pb-28 overflow-hidden">
+      {/* Hero Section Container: Full-screen on mobile (taking 4rem header into account) */}
+      <div className="relative min-h-[calc(100svh-4rem)] flex flex-col justify-center items-center bg-[linear-gradient(to_right,#e2e8f080_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f080_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,#1e293b40_1px,transparent_1px),linear-gradient(to_bottom,#1e293b40_1px,transparent_1px)] bg-[size:36px_36px] py-10 sm:py-16">
         {/* Soft radial mask to fade grid edges */}
         <div className="absolute inset-0 bg-radial-[circle_at_center,transparent_30%,white_90%] dark:bg-radial-[circle_at_center,transparent_30%,#09090B_90%] pointer-events-none" />
 
         {/* Hero Content */}
-        <section className="relative text-center max-w-4xl mx-auto space-y-6 sm:space-y-8 px-4 sm:px-6 pt-2 pb-14 sm:pb-20 flex flex-col justify-center items-center z-10">
+        <section className="relative text-center max-w-4xl mx-auto space-y-6 sm:space-y-8 px-4 sm:px-6 flex flex-col justify-center items-center z-10 w-full my-auto">
           {/* Top Pill Badge */}
           <motion.div
             initial={{ opacity: 0, y: 15 }}
@@ -302,10 +302,21 @@ export const LandingView: React.FC<LandingViewProps> = ({
             </button>
           </motion.div>
         </section>
+
+        {/* Subtle scroll down indicator on mobile/desktop */}
+        <div className="pt-6 pb-2 text-center text-zinc-400 dark:text-zinc-600 hidden sm:block">
+          <button
+            onClick={scrollToPricing}
+            className="inline-flex flex-col items-center gap-1 text-[11px] font-semibold hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors cursor-pointer"
+          >
+            <span>{isAmharic ? 'ወደ ዋጋ ዝርዝር' : 'Explore Plans'}</span>
+            <ChevronDown className="w-3.5 h-3.5 animate-bounce" />
+          </button>
+        </div>
       </div>
 
-      {/* Pricing Cards Section */}
-      <section id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-14 scroll-mt-24">
+      {/* Pricing Cards Section: Screen-spaced and scroll-anchored */}
+      <section id="pricing" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 sm:space-y-14 scroll-mt-20 sm:scroll-mt-24 min-h-[calc(100svh-4rem)] sm:min-h-0 flex flex-col justify-center py-6 sm:py-12">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -431,8 +442,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </div>
       </section>
 
-      {/* Testimonial Section */}
-      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* Testimonial Section: Cleanly spaced */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8 min-h-[50svh] sm:min-h-0 flex flex-col justify-center">
         <div className="bg-zinc-900 text-white rounded-3xl p-8 sm:p-12 text-center space-y-6 shadow-2xl relative overflow-hidden border border-zinc-800">
           <Quote className="w-8 h-8 text-zinc-400 dark:text-zinc-500 mx-auto" />
           <blockquote className="text-lg sm:text-xl md:text-2xl font-medium leading-relaxed max-w-2xl mx-auto">
@@ -445,8 +456,8 @@ export const LandingView: React.FC<LandingViewProps> = ({
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+      {/* FAQ Section: Cleanly spaced */}
+      <section className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 py-6 sm:py-12 min-h-[60svh] sm:min-h-0 flex flex-col justify-center">
         <div className="text-center space-y-2">
           <Badge variant="zinc">FAQ</Badge>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -493,7 +504,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
         whileInView={{ opacity: 1, y: 0, scale: 1 }}
         viewport={{ once: true, margin: "-60px" }}
         transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        className="max-w-5xl mx-auto px-4"
+        className="max-w-5xl mx-auto px-4 py-6 sm:py-10 min-h-[45svh] sm:min-h-0 flex flex-col justify-center"
       >
         <div className="p-8 sm:p-10 rounded-3xl bg-zinc-900 dark:bg-zinc-100 text-zinc-50 dark:text-zinc-950 text-center space-y-6 shadow-2xl relative overflow-hidden">
           <div className="space-y-2 max-w-xl mx-auto">
