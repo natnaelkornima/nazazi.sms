@@ -96,15 +96,13 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <button
-              type="button"
-              id="payment-image-change-btn"
-              onClick={triggerUpload}
-              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-zinc-200/80 hover:bg-zinc-300/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
+          <div className="flex items-center gap-1.5 shrink-0 relative z-10">
+            <label
+              htmlFor={inputId}
+              className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-zinc-200/80 hover:bg-zinc-300/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer inline-flex items-center"
             >
               {isAmharic ? 'ቀይር' : 'Change'}
-            </button>
+            </label>
             {onClear && (
               <button
                 type="button"
@@ -123,8 +121,7 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
-          onClick={triggerUpload}
-          className={`relative cursor-pointer rounded-xl border border-dashed transition-all duration-150 py-5 px-4 flex flex-col items-center justify-center text-center select-none ${
+          className={`relative overflow-hidden cursor-pointer rounded-xl border border-dashed transition-all duration-150 py-5 px-4 flex flex-col items-center justify-center text-center select-none ${
             error
               ? 'border-red-400 dark:border-red-500/60 bg-red-50/20 dark:bg-red-950/10'
               : isDragging
@@ -132,26 +129,35 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
                 : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/40 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/80'
           }`}
         >
-          <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-2 text-zinc-600 dark:text-zinc-300 shadow-2xs">
+          {/* Transparent full-size native input overlay for TikTok, Instagram, and mobile WebViews */}
+          <input
+            ref={fileInputRef}
+            id={inputId}
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              if (e.target.files && e.target.files[0]) {
+                handleFileChange(e.target.files[0]);
+              }
+            }}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+          />
+
+          <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-2 text-zinc-600 dark:text-zinc-300 shadow-2xs pointer-events-none">
             <CloudUpload className="w-5 h-5 stroke-[2]" />
           </div>
 
-          <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
+          <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 pointer-events-none">
             {isAmharic ? 'የደረሰኝ ፎቶ እዚህ ይጫኑ (እስከ 5MB)' : 'Click or drop payment image here (Max 5MB)'}
           </p>
-          <p className="text-[11px] text-zinc-400 mt-0.5">
+          <p className="text-[11px] text-zinc-400 mt-0.5 pointer-events-none">
             JPG, JPEG, PNG, WEBP
           </p>
 
-          <button
-            type="button"
-            id="payment-image-upload-btn"
-            onClick={triggerUpload}
-            className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 transition-all cursor-pointer shadow-xs active:scale-95"
-          >
+          <div className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 shadow-xs pointer-events-none">
             <Upload className="w-3.5 h-3.5" />
             <span>{isAmharic ? 'ምስል ጫን (Upload)' : 'Upload'}</span>
-          </button>
+          </div>
         </div>
       )}
 
@@ -160,19 +166,6 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
           {error}
         </p>
       )}
-
-      <input
-        ref={fileInputRef}
-        id={inputId}
-        type="file"
-        accept="image/*,.jpg,.jpeg,.png,.webp"
-        onChange={(e) => {
-          if (e.target.files && e.target.files[0]) {
-            handleFileChange(e.target.files[0]);
-          }
-        }}
-        className="hidden"
-      />
     </div>
   );
 };

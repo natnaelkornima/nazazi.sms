@@ -486,8 +486,7 @@ export default function RegisterPage() {
                         onDrop={handleDrop}
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
-                        onClick={() => fileInputRef.current?.click()}
-                        className={`cursor-pointer rounded-2xl border border-dashed transition-all duration-150 py-6 px-4 flex flex-col items-center justify-center text-center select-none ${
+                        className={`relative overflow-hidden cursor-pointer rounded-2xl border border-dashed transition-all duration-150 py-6 px-4 flex flex-col items-center justify-center text-center select-none ${
                           fileError
                             ? 'border-red-500/80 bg-red-950/20'
                             : isDragging
@@ -495,28 +494,34 @@ export default function RegisterPage() {
                               : 'border-zinc-700/80 bg-zinc-950/70 hover:border-zinc-500 hover:bg-zinc-950'
                         }`}
                       >
-                        <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center mb-2.5 text-zinc-300">
+                        {/* Transparent full-size native input overlay for TikTok, Instagram, and mobile WebViews */}
+                        <input
+                          ref={fileInputRef}
+                          id="register-receipt-file-input"
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleFileSelect(e.target.files[0]);
+                            }
+                          }}
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                        />
+
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center mb-2.5 text-zinc-300 pointer-events-none">
                           <Upload className="w-4 h-4" />
                         </div>
-                        <p className="text-xs font-bold text-zinc-200">
+                        <p className="text-xs font-bold text-zinc-200 pointer-events-none">
                           Click to upload or drag payment image here
                         </p>
-                        <p className="text-[11px] text-zinc-500 mt-1">
+                        <p className="text-[11px] text-zinc-500 mt-1 pointer-events-none">
                           Supported formats: JPG, JPEG, PNG, WEBP (Max 5 MB)
                         </p>
 
-                        <button
-                          type="button"
-                          id="register-page-upload-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            fileInputRef.current?.click();
-                          }}
-                          className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-zinc-950 bg-zinc-100 hover:bg-zinc-200 transition-all cursor-pointer shadow-xs active:scale-95"
-                        >
+                        <div className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-zinc-950 bg-zinc-100 shadow-xs pointer-events-none">
                           <Upload className="w-3.5 h-3.5" />
                           <span>Upload</span>
-                        </button>
+                        </div>
                       </div>
                     )}
 
@@ -526,18 +531,6 @@ export default function RegisterPage() {
                         {fileError}
                       </p>
                     )}
-
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".jpg,.jpeg,.png,.webp,image/*"
-                      onChange={(e) => {
-                        if (e.target.files && e.target.files[0]) {
-                          handleFileSelect(e.target.files[0]);
-                        }
-                      }}
-                      className="hidden"
-                    />
                   </div>
 
                   {/* Upload Progress Bar (when submitting) */}
