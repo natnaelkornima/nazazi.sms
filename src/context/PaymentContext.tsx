@@ -173,6 +173,8 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
 
           setSubmissions((prev) => {
+            const syncQueue: Array<{ id: string; phone: string; status: 'approved' | 'rejected' }> = [];
+
             const merged = cleanList.map((item) => {
               const clean = item.userPhone.replace(/\D/g, '');
               const prevItem = prev.find(
@@ -189,9 +191,18 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
               let effectiveStatus = item.status;
               let effectiveReviewedAt = item.reviewedAt;
 
+              // If local device already had this approved or rejected, preserve it and queue a server sync if server was pending
               if (prevItem && (prevItem.status === 'approved' || prevItem.status === 'rejected')) {
                 effectiveStatus = prevItem.status;
                 effectiveReviewedAt = prevItem.reviewedAt || item.reviewedAt;
+
+                if (item.status === 'pending') {
+                  syncQueue.push({
+                    id: item.id,
+                    phone: item.userPhone,
+                    status: prevItem.status,
+                  });
+                }
               }
 
               return {
@@ -202,6 +213,18 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 reviewedAt: effectiveReviewedAt,
               };
             });
+
+            // If any local approved items weren't registered on server, sync them in the background
+            if (syncQueue.length > 0) {
+              const headers = getAdminAuthHeaders();
+              syncQueue.forEach(({ id, phone, status }) => {
+                fetch('/api/admin/registrations', {
+                  method: 'PATCH',
+                  headers,
+                  body: JSON.stringify({ id, phone, status }),
+                }).catch(() => {});
+              });
+            }
 
             // Also preserve any recently added local submissions not yet present in server response
             const existingIds = new Set(cleanList.map((c) => c.id));

@@ -1,4 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import fs from 'fs';
+import path from 'path';
 import { canonicalPhone, phoneMatches } from './validation';
 import { normalizePlanAndAmount } from './planUtils';
 
@@ -110,6 +112,76 @@ function normalizePhoneKey(phone: string): string {
 // Persistent map to track registered plans & amounts even if Supabase schema lacks plan columns
 const planMetaCache = new Map<string, { planName: string; amount: number }>();
 
+const PRIMARY_DATA_DIR = path.join(process.cwd(), '.data');
+const PRIMARY_STATE_FILE = path.join(PRIMARY_DATA_DIR, 'nazazi_admin_state.json');
+const TMP_STATE_FILE = '/tmp/nazazi_admin_state.json';
+
+function saveStateToDisk() {
+  try {
+    const dataToSave = {
+      statusOverrides: Array.from(statusOverridesMap.entries()),
+      planMeta: Array.from(planMetaCache.entries()),
+      inMemoryRegistrations,
+      savedAt: new Date().toISOString(),
+    };
+    const jsonStr = JSON.stringify(dataToSave, null, 2);
+
+    try {
+      if (!fs.existsSync(PRIMARY_DATA_DIR)) {
+        fs.mkdirSync(PRIMARY_DATA_DIR, { recursive: true });
+      }
+      fs.writeFileSync(PRIMARY_STATE_FILE, jsonStr, 'utf-8');
+    } catch {
+      // Primary write failed, try /tmp
+    }
+
+    try {
+      fs.writeFileSync(TMP_STATE_FILE, jsonStr, 'utf-8');
+    } catch {
+      // tmp write fallback
+    }
+  } catch (err) {
+    console.warn('Notice: Server state persist warning:', err);
+  }
+}
+
+function loadStateFromDisk() {
+  const candidateFiles = [PRIMARY_STATE_FILE, TMP_STATE_FILE];
+  for (const filePath of candidateFiles) {
+    try {
+      if (fs.existsSync(filePath)) {
+        const raw = fs.readFileSync(filePath, 'utf-8');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed.statusOverrides)) {
+            for (const [k, v] of parsed.statusOverrides) {
+              if (k && v && typeof v === 'object' && v.status) {
+                statusOverridesMap.set(k, v);
+              }
+            }
+          }
+          if (Array.isArray(parsed.planMeta)) {
+            for (const [k, v] of parsed.planMeta) {
+              if (k && v && typeof v === 'object' && v.planName) {
+                planMetaCache.set(k, v);
+              }
+            }
+          }
+          if (Array.isArray(parsed.inMemoryRegistrations) && inMemoryRegistrations.length === 0) {
+            inMemoryRegistrations = parsed.inMemoryRegistrations;
+          }
+          return;
+        }
+      }
+    } catch {
+      // Continue to next candidate
+    }
+  }
+}
+
+// Load persisted state immediately on server init
+loadStateFromDisk();
+
 function recordPlanMeta(id: string | undefined, phone: string | undefined, planName: string, amount: number) {
   if (id) {
     planMetaCache.set(id, { planName, amount });
@@ -122,6 +194,7 @@ function recordPlanMeta(id: string | undefined, phone: string | undefined, planN
       planMetaCache.set(last8, { planName, amount });
     }
   }
+  saveStateToDisk();
 }
 
 /**
@@ -981,6 +1054,8 @@ export async function updateRegistrationStatus(
     return r;
   });
 
+  saveStateToDisk();
+
   const client = getSupabaseClient();
   if (!client) {
     return { success: true };
@@ -1007,7 +1082,12 @@ export async function updateRegistrationStatus(
         { status },
         { is_approved: status === 'approved', is_rejected: status === 'rejected', reviewed_at: nowIso },
         { approved: status === 'approved', rejected: status === 'rejected' },
+        { is_approved: status === 'approved' },
+        { approved: status === 'approved' },
+        { is_active: status === 'approved' },
+        { active: status === 'approved' },
         { state: status, reviewed_at: nowIso },
+        { state: status },
         { payment_status: status },
         { subscription_status: status },
       ];
@@ -1016,11 +1096,27 @@ export async function updateRegistrationStatus(
         if (id && !id.startsWith('reg_')) {
           const { error } = await client.from(tableName).update(payload).eq('id', id);
           if (!error) break;
+          if (!isNaN(Number(id))) {
+            const { error: numErr } = await client.from(tableName).update(payload).eq('id', Number(id));
+            if (!numErr) break;
+          }
         }
       }
 
-      if (last8 && last8.length >= 7) {
-        for (const phoneCol of ['phone_number', 'phone', 'user_phone', 'mobile']) {
+      for (const phoneCol of ['phone_number', 'phone', 'user_phone', 'mobile']) {
+        if (rawPhone) {
+          for (const payload of updatePayloads) {
+            const { error } = await client.from(tableName).update(payload).eq(phoneCol, rawPhone);
+            if (!error) break;
+          }
+        }
+        if (canonical) {
+          for (const payload of updatePayloads) {
+            const { error } = await client.from(tableName).update(payload).eq(phoneCol, canonical);
+            if (!error) break;
+          }
+        }
+        if (last8 && last8.length >= 7) {
           for (const payload of updatePayloads) {
             const { error } = await client.from(tableName).update(payload).ilike(phoneCol, `%${last8}%`);
             if (!error) break;
@@ -1056,6 +1152,8 @@ export async function deleteRegistration(
     return true;
   });
 
+  saveStateToDisk();
+
   const client = getSupabaseClient();
   if (!client) return { success: true };
 
@@ -1064,6 +1162,9 @@ export async function deleteRegistration(
     try {
       if (id && !id.startsWith('reg_')) {
         await client.from(tableName).delete().eq('id', id);
+        if (!isNaN(Number(id))) {
+          await client.from(tableName).delete().eq('id', Number(id));
+        }
       }
       if (phoneNumber) {
         const last8 = phoneNumber.replace(/\D/g, '').slice(-8);
@@ -1087,6 +1188,8 @@ export async function deleteRegistration(
 export async function resetAllRegistrations(): Promise<{ success: boolean; count: number; error?: string }> {
   inMemoryRegistrations = [];
   statusOverridesMap.clear();
+  planMetaCache.clear();
+  saveStateToDisk();
 
   const client = getSupabaseClient();
   if (!client) return { success: true, count: 0 };
