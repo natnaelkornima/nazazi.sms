@@ -57,7 +57,7 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
     setIsDragging(false);
   };
 
-  const triggerUpload = (e?: React.MouseEvent) => {
+  const triggerUpload = (e?: React.MouseEvent | React.TouchEvent) => {
     if (e) {
       e.stopPropagation();
     }
@@ -97,12 +97,13 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 relative z-10">
-            <label
-              htmlFor={inputId}
+            <button
+              type="button"
+              onClick={triggerUpload}
               className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-zinc-200/80 hover:bg-zinc-300/80 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer inline-flex items-center"
             >
               {isAmharic ? 'ቀይር' : 'Change'}
-            </label>
+            </button>
             {onClear && (
               <button
                 type="button"
@@ -118,6 +119,7 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
         </div>
       ) : (
         <div
+          onClick={() => fileInputRef.current?.click()}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -129,7 +131,7 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
                 : 'border-zinc-300 dark:border-zinc-700 bg-zinc-50/50 dark:bg-zinc-900/40 hover:border-zinc-400 dark:hover:border-zinc-600 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/80'
           }`}
         >
-          {/* Transparent full-size native input overlay for TikTok, Instagram, and mobile WebViews */}
+          {/* Native file input */}
           <input
             ref={fileInputRef}
             id={inputId}
@@ -140,24 +142,33 @@ export const GlassFolderUploader: React.FC<GlassFolderUploaderProps> = ({
                 handleFileChange(e.target.files[0]);
               }
             }}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+            className="sr-only"
           />
 
-          <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-2 text-zinc-600 dark:text-zinc-300 shadow-2xs pointer-events-none">
+          <div className="w-10 h-10 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-2 text-zinc-600 dark:text-zinc-300 shadow-2xs">
             <CloudUpload className="w-5 h-5 stroke-[2]" />
           </div>
 
-          <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200 pointer-events-none">
+          <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
             {isAmharic ? 'የደረሰኝ ፎቶ እዚህ ይጫኑ (እስከ 5MB)' : 'Click or drop payment image here (Max 5MB)'}
           </p>
-          <p className="text-[11px] text-zinc-400 mt-0.5 pointer-events-none">
+          <p className="text-[11px] text-zinc-400 mt-0.5">
             JPG, JPEG, PNG, WEBP
           </p>
 
-          <div className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-zinc-900 dark:bg-zinc-100 dark:text-zinc-950 shadow-xs pointer-events-none">
+          {/* Explicit Upload Button that directly triggers file picker */}
+          <button
+            type="button"
+            id={`${inputId}-upload-button`}
+            onClick={(e) => {
+              e.stopPropagation();
+              fileInputRef.current?.click();
+            }}
+            className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-100 dark:hover:bg-white dark:text-zinc-950 shadow-xs cursor-pointer active:scale-95 transition-all"
+          >
             <Upload className="w-3.5 h-3.5" />
             <span>{isAmharic ? 'ምስል ጫን (Upload)' : 'Upload'}</span>
-          </div>
+          </button>
         </div>
       )}
 

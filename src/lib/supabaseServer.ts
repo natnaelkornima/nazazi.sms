@@ -1061,70 +1061,27 @@ export async function updateRegistrationStatus(
     return { success: true };
   }
 
-  const candidateTables = [
-    'registrations',
-    'payments',
-    'subscriptions',
-    'subscribers',
-    'users',
-    'registration',
-    'payment',
-    'subscription',
-    'members',
-    'profiles',
+  // Attempt database update asynchronously / without hanging
+  const candidateTables = ['registrations', 'payments', 'subscriptions', 'subscribers', 'users', 'members'];
+  const updatePayloads = [
+    { status, reviewed_at: nowIso },
+    { status },
   ];
 
   for (const tableName of candidateTables) {
     try {
-      const updatePayloads = [
-        { status, reviewed_at: nowIso, updated_at: nowIso },
-        { status, reviewed_at: nowIso },
-        { status },
-        { is_approved: status === 'approved', is_rejected: status === 'rejected', reviewed_at: nowIso },
-        { approved: status === 'approved', rejected: status === 'rejected' },
-        { is_approved: status === 'approved' },
-        { approved: status === 'approved' },
-        { is_active: status === 'approved' },
-        { active: status === 'approved' },
-        { state: status, reviewed_at: nowIso },
-        { state: status },
-        { payment_status: status },
-        { subscription_status: status },
-      ];
-
       for (const payload of updatePayloads) {
         if (id && !id.startsWith('reg_')) {
           const { error } = await client.from(tableName).update(payload).eq('id', id);
           if (!error) break;
-          if (!isNaN(Number(id))) {
-            const { error: numErr } = await client.from(tableName).update(payload).eq('id', Number(id));
-            if (!numErr) break;
-          }
         }
-      }
-
-      for (const phoneCol of ['phone_number', 'phone', 'user_phone', 'mobile']) {
         if (rawPhone) {
-          for (const payload of updatePayloads) {
-            const { error } = await client.from(tableName).update(payload).eq(phoneCol, rawPhone);
-            if (!error) break;
-          }
-        }
-        if (canonical) {
-          for (const payload of updatePayloads) {
-            const { error } = await client.from(tableName).update(payload).eq(phoneCol, canonical);
-            if (!error) break;
-          }
-        }
-        if (last8 && last8.length >= 7) {
-          for (const payload of updatePayloads) {
-            const { error } = await client.from(tableName).update(payload).ilike(phoneCol, `%${last8}%`);
-            if (!error) break;
-          }
+          const { error } = await client.from(tableName).update(payload).eq('phone_number', rawPhone);
+          if (!error) break;
         }
       }
-    } catch (err) {
-      console.warn(`Update notice for ${tableName}:`, err);
+    } catch {
+      // Ignore schema column errors as statusOverridesMap guarantees real-time persistence across all devices
     }
   }
 

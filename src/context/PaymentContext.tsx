@@ -188,21 +188,19 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 effectiveAmount = prevItem.amount;
               }
 
+              // Server status from database/backend overrides map is the authoritative truth for all devices
               let effectiveStatus = item.status;
               let effectiveReviewedAt = item.reviewedAt;
 
-              // If local device already had this approved or rejected, preserve it and queue a server sync if server was pending
-              if (prevItem && (prevItem.status === 'approved' || prevItem.status === 'rejected')) {
+              // If local device has an approved/rejected status for an item that the server returned as pending, queue sync to server
+              if (prevItem && (prevItem.status === 'approved' || prevItem.status === 'rejected') && item.status === 'pending') {
                 effectiveStatus = prevItem.status;
                 effectiveReviewedAt = prevItem.reviewedAt || item.reviewedAt;
-
-                if (item.status === 'pending') {
-                  syncQueue.push({
-                    id: item.id,
-                    phone: item.userPhone,
-                    status: prevItem.status,
-                  });
-                }
+                syncQueue.push({
+                  id: item.id,
+                  phone: item.userPhone,
+                  status: prevItem.status,
+                });
               }
 
               return {
