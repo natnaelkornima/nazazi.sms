@@ -60,35 +60,35 @@
       "11dd1e82-5e19-4319-b3d9-c4a55c17438e",
       {
         "status": "approved",
-        "reviewed_at": "2026-08-25T12:39:25.769Z"
+        "reviewed_at": "2026-08-25T12:51:50.396Z"
       }
     ],
     [
       "0910120059",
       {
         "status": "approved",
-        "reviewed_at": "2026-08-25T12:39:25.769Z"
+        "reviewed_at": "2026-08-25T12:51:50.396Z"
       }
     ],
     [
       "10120059",
       {
         "status": "approved",
-        "reviewed_at": "2026-08-25T12:39:25.769Z"
+        "reviewed_at": "2026-08-25T12:51:50.396Z"
       }
     ],
     [
       "0710120059",
       {
         "status": "approved",
-        "reviewed_at": "2026-08-25T12:39:25.769Z"
+        "reviewed_at": "2026-08-25T12:51:50.396Z"
       }
     ],
     [
       "+251910120059",
       {
         "status": "approved",
-        "reviewed_at": "2026-08-25T12:39:25.769Z"
+        "reviewed_at": "2026-08-25T12:51:50.396Z"
       }
     ],
     [
@@ -102,7 +102,7 @@
       "251910120059",
       {
         "status": "approved",
-        "reviewed_at": "2026-08-25T12:39:25.769Z"
+        "reviewed_at": "2026-08-25T12:51:50.396Z"
       }
     ],
     [
@@ -113,7 +113,29 @@
       }
     ]
   ],
-  "planMeta": [],
+  "planMeta": [
+    [
+      "11dd1e82-5e19-4319-b3d9-c4a55c17438e",
+      {
+        "planName": "1 Month Access (200 Birr)",
+        "amount": 200
+      }
+    ],
+    [
+      "0910120059",
+      {
+        "planName": "1 Month Access (200 Birr)",
+        "amount": 200
+      }
+    ],
+    [
+      "10120059",
+      {
+        "planName": "1 Month Access (200 Birr)",
+        "amount": 200
+      }
+    ]
+  ],
   "inMemoryRegistrations": [],
-  "savedAt": "2026-08-25T12:39:25.769Z"
+  "savedAt": "2026-08-25T12:51:50.397Z"
 }

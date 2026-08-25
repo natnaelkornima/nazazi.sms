@@ -89,6 +89,7 @@ export const AdminLoginGate: React.FC<AdminLoginGateProps> = ({ onSuccess, onCan
       if (data.session?.token) {
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('nazazi_admin_token', data.session.token);
+          localStorage.setItem('nazazi_admin_token', data.session.token);
           localStorage.setItem('nazazi_admin_auth_at', new Date().toISOString());
         }
       }

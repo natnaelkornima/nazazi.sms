@@ -48,7 +48,9 @@ function getAdminAuthHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
   };
   if (typeof window !== 'undefined') {
-    const token = sessionStorage.getItem('nazazi_admin_token');
+    const token =
+      sessionStorage.getItem('nazazi_admin_token') ||
+      localStorage.getItem('nazazi_admin_token');
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
       headers['x-admin-token'] = token;
@@ -173,8 +175,6 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
 
           setSubmissions((prev) => {
-            const syncQueue: Array<{ id: string; phone: string; status: 'approved' | 'rejected' }> = [];
-
             const merged = cleanList.map((item) => {
               const clean = item.userPhone.replace(/\D/g, '');
               const prevItem = prev.find(
@@ -192,15 +192,10 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
               let effectiveStatus = item.status;
               let effectiveReviewedAt = item.reviewedAt;
 
-              // If local device has an approved/rejected status for an item that the server returned as pending, queue sync to server
+              // If local device has an approved/rejected status for an item that the server returned as pending, prioritize local and queue sync
               if (prevItem && (prevItem.status === 'approved' || prevItem.status === 'rejected') && item.status === 'pending') {
                 effectiveStatus = prevItem.status;
                 effectiveReviewedAt = prevItem.reviewedAt || item.reviewedAt;
-                syncQueue.push({
-                  id: item.id,
-                  phone: item.userPhone,
-                  status: prevItem.status,
-                });
               }
 
               return {
@@ -212,16 +207,25 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
               };
             });
 
-            // If any local approved items weren't registered on server, sync them in the background
-            if (syncQueue.length > 0) {
+            // If local device has approved/rejected submissions, perform a single fast bulk sync to cloud
+            const localStatusesToSync = prev
+              .filter((p) => p.status === 'approved' || p.status === 'rejected')
+              .map((p) => ({
+                id: p.id,
+                phone: p.userPhone,
+                status: p.status,
+                planName: p.planName,
+                amount: p.amount,
+                reviewedAt: p.reviewedAt,
+              }));
+
+            if (localStatusesToSync.length > 0) {
               const headers = getAdminAuthHeaders();
-              syncQueue.forEach(({ id, phone, status }) => {
-                fetch('/api/admin/registrations', {
-                  method: 'PATCH',
-                  headers,
-                  body: JSON.stringify({ id, phone, status }),
-                }).catch(() => {});
-              });
+              fetch('/api/admin/sync', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ records: localStatusesToSync }),
+              }).catch(() => {});
             }
 
             // Also preserve any recently added local submissions not yet present in server response

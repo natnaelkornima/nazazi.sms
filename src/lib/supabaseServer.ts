@@ -1162,3 +1162,75 @@ export async function resetAllRegistrations(): Promise<{ success: boolean; count
 
   return { success: true, count: 0 };
 }
+
+export interface BatchSyncRecordInput {
+  id?: string;
+  phone?: string;
+  phoneNumber?: string;
+  userPhone?: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  planName?: string;
+  amount?: number;
+  reviewedAt?: string;
+}
+
+/**
+ * Bulk sync statuses from client device or backup to server state & disk
+ */
+export async function batchSyncRegistrations(
+  records: BatchSyncRecordInput[]
+): Promise<{ success: boolean; updatedCount: number }> {
+  if (!Array.isArray(records) || records.length === 0) {
+    return { success: true, updatedCount: 0 };
+  }
+
+  const nowIso = new Date().toISOString();
+  let updatedCount = 0;
+
+  for (const item of records) {
+    const rawPhone = item.phone || item.phoneNumber || item.userPhone;
+    const cleanPhone = normalizePhoneKey(rawPhone || '');
+    const canon = rawPhone ? canonicalPhone(rawPhone) : '';
+    const rawDigits = (rawPhone || '').replace(/\D/g, '');
+    const last8 = rawDigits.slice(-8);
+    const reviewedTime = item.reviewedAt || nowIso;
+
+    if (item.status && (item.status === 'approved' || item.status === 'rejected')) {
+      const overrideObj = { status: item.status, reviewed_at: reviewedTime };
+      if (item.id) {
+        statusOverridesMap.set(item.id, overrideObj);
+      }
+      if (rawPhone) {
+        statusOverridesMap.set(rawPhone, overrideObj);
+      }
+      if (cleanPhone) {
+        statusOverridesMap.set(cleanPhone, overrideObj);
+      }
+      if (canon) {
+        statusOverridesMap.set(canon, overrideObj);
+      }
+      if (rawDigits) {
+        statusOverridesMap.set(rawDigits, overrideObj);
+      }
+      if (last8 && last8.length >= 7) {
+        statusOverridesMap.set(last8, overrideObj);
+        statusOverridesMap.set(`09${last8}`, overrideObj);
+        statusOverridesMap.set(`07${last8}`, overrideObj);
+        statusOverridesMap.set(`+2519${last8}`, overrideObj);
+        statusOverridesMap.set(`2519${last8}`, overrideObj);
+      }
+      updatedCount++;
+    }
+
+    if (item.planName && typeof item.amount === 'number') {
+      recordPlanMeta(item.id, rawPhone, item.planName, item.amount);
+    }
+  }
+
+  saveStateToDisk();
+
+  return {
+    success: true,
+    updatedCount,
+  };
+}

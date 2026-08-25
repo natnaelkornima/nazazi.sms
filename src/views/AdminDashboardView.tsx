@@ -94,7 +94,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   const { language, toggleLanguage } = useLanguage();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      const token = sessionStorage.getItem('nazazi_admin_token');
+      const token =
+        sessionStorage.getItem('nazazi_admin_token') ||
+        localStorage.getItem('nazazi_admin_token');
       return !!token;
     }
     return false;
@@ -117,6 +119,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   const handleLogout = () => {
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('nazazi_admin_token');
+      localStorage.removeItem('nazazi_admin_token');
       localStorage.removeItem('nazazi_admin_auth_at');
     }
     setIsAuthenticated(false);
@@ -666,8 +669,23 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
           </div>
         </div>
 
-        {/* Settings Menu Popover */}
-        <div className="relative" ref={settingsRef}>
+        <div className="flex items-center gap-2">
+          {/* Quick Sync Button */}
+          <button
+            onClick={() => {
+              fetchRegistrations();
+              info('Synced', 'Registrations refreshed & synced across all devices.');
+            }}
+            disabled={isLoading}
+            className="p-2 sm:px-3 sm:py-2.5 rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-all flex items-center gap-1.5 sm:gap-2 text-xs font-bold cursor-pointer group shadow-xs disabled:opacity-50"
+            title="Refresh & Cloud Sync"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-amber-500' : 'text-zinc-500'}`} />
+            <span className="hidden sm:inline">Sync</span>
+          </button>
+
+          {/* Settings Menu Popover */}
+          <div className="relative" ref={settingsRef}>
           <button
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
             className={`p-2 sm:px-3 sm:py-2.5 rounded-xl sm:rounded-2xl border transition-all flex items-center gap-1.5 sm:gap-2 text-xs font-bold cursor-pointer group shadow-xs ${
@@ -833,6 +851,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
           </AnimatePresence>
         </div>
       </div>
+    </div>
 
       {/* 2. Top Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
