@@ -61,17 +61,12 @@ export const Navbar: React.FC<NavbarProps> = ({
             onClick={() => onNavigate('landing')}
             className="flex items-center gap-2.5 group text-left cursor-pointer focus:outline-none"
           >
-            <div className="w-9 h-9 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-200 font-black text-lg">
+            <div className="w-9 h-9 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-200 font-black text-lg shrink-0">
               <span>N</span>
             </div>
-            <div className="flex flex-col">
-              <span className={`font-black tracking-tight text-lg text-zinc-900 dark:text-zinc-50 leading-none ${isAmharic ? 'font-nazazi' : ''}`}>
-                {t('header.title')}
-              </span>
-              <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-medium pt-0.5">
-                {isAmharic ? 'የመንፈሳዊ SMS አገልግሎት' : 'Spiritual SMS Platform'}
-              </span>
-            </div>
+            <span className={`font-black tracking-tight text-xl text-zinc-900 dark:text-zinc-50 leading-none flex items-center ${isAmharic ? 'font-nazazi' : ''}`}>
+              {t('header.title')}
+            </span>
           </button>
         </div>
 

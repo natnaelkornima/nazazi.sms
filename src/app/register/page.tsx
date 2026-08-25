@@ -487,7 +487,7 @@ export default function RegisterPage() {
                         onDragOver={handleDragOver}
                         onDragLeave={handleDragLeave}
                         onClick={() => fileInputRef.current?.click()}
-                        className={`cursor-pointer rounded-2xl border border-dashed transition-all duration-150 py-6 px-4 flex flex-col items-center justify-center text-center ${
+                        className={`cursor-pointer rounded-2xl border border-dashed transition-all duration-150 py-6 px-4 flex flex-col items-center justify-center text-center select-none ${
                           fileError
                             ? 'border-red-500/80 bg-red-950/20'
                             : isDragging
@@ -504,6 +504,19 @@ export default function RegisterPage() {
                         <p className="text-[11px] text-zinc-500 mt-1">
                           Supported formats: JPG, JPEG, PNG, WEBP (Max 5 MB)
                         </p>
+
+                        <button
+                          type="button"
+                          id="register-page-upload-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            fileInputRef.current?.click();
+                          }}
+                          className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold text-zinc-950 bg-zinc-100 hover:bg-zinc-200 transition-all cursor-pointer shadow-xs active:scale-95"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload</span>
+                        </button>
                       </div>
                     )}
 
