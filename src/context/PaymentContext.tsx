@@ -59,6 +59,70 @@ function getAdminAuthHeaders(): Record<string, string> {
   return headers;
 }
 
+const getLocalTombstones = (): Set<string> => {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = localStorage.getItem('nazazi_deleted_tombstones');
+    if (raw) {
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) return new Set(arr);
+    }
+  } catch {}
+  return new Set();
+};
+
+const addLocalTombstone = (id: string, phone?: string) => {
+  if (typeof window === 'undefined') return;
+  try {
+    const tombstones = getLocalTombstones();
+    if (id) tombstones.add(id);
+    if (phone) {
+      const clean = phone.replace(/\D/g, '');
+      tombstones.add(phone);
+      if (clean) tombstones.add(clean);
+      const last8 = clean.slice(-8);
+      if (last8 && last8.length >= 7) {
+        tombstones.add(last8);
+        tombstones.add(`09${last8}`);
+        tombstones.add(`07${last8}`);
+      }
+    }
+    localStorage.setItem('nazazi_deleted_tombstones', JSON.stringify(Array.from(tombstones)));
+  } catch {}
+};
+
+const removeLocalTombstone = (phone?: string) => {
+  if (typeof window === 'undefined' || !phone) return;
+  try {
+    const tombstones = getLocalTombstones();
+    const clean = phone.replace(/\D/g, '');
+    tombstones.delete(phone);
+    if (clean) tombstones.delete(clean);
+    const last8 = clean.slice(-8);
+    if (last8 && last8.length >= 7) {
+      tombstones.delete(last8);
+      tombstones.delete(`09${last8}`);
+      tombstones.delete(`07${last8}`);
+    }
+    localStorage.setItem('nazazi_deleted_tombstones', JSON.stringify(Array.from(tombstones)));
+  } catch {}
+};
+
+const isLocallyTombstoned = (id?: string, phone?: string, tombstones?: Set<string>): boolean => {
+  const ts = tombstones || getLocalTombstones();
+  if (id && ts.has(id)) return true;
+  if (phone) {
+    if (ts.has(phone)) return true;
+    const clean = phone.replace(/\D/g, '');
+    if (clean && ts.has(clean)) return true;
+    const last8 = clean.slice(-8);
+    if (last8 && last8.length >= 7) {
+      if (ts.has(last8) || ts.has(`09${last8}`) || ts.has(`07${last8}`)) return true;
+    }
+  }
+  return false;
+};
+
 export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [submissions, setSubmissions] = useState<PaymentSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -164,9 +228,11 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
           // Deduplicate by ID and normalized Phone to prevent any duplicates
           const seenIds = new Set<string>();
           const seenPhones = new Set<string>();
+          const localTombstones = getLocalTombstones();
           const cleanList: PaymentSubmission[] = [];
 
           for (const item of mapped) {
+            if (isLocallyTombstoned(item.id, item.userPhone, localTombstones)) continue;
             const clean = item.userPhone.replace(/\D/g, '');
             if (seenIds.has(item.id)) continue;
             if (clean && seenPhones.has(clean)) continue;
@@ -236,6 +302,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
             const existingPhones = new Set(cleanList.map((c) => c.userPhone.replace(/\D/g, '')).filter(Boolean));
 
             const additionalLocal = prev.filter((p) => {
+              if (isLocallyTombstoned(p.id, p.userPhone, localTombstones)) return false;
               const pPhone = p.userPhone.replace(/\D/g, '');
               return !existingIds.has(p.id) && (!pPhone || !existingPhones.has(pPhone));
             });
@@ -338,6 +405,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     // Direct submit to /api/register
     try {
+      removeLocalTombstone(data.userPhone);
       const response = await fetch('/api/register', {
         method: 'POST',
         headers: {
@@ -492,6 +560,9 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const existing = submissions.find((s) => s.id === id);
     const targetPhone = phone || existing?.userPhone || '';
 
+    // Permanently record in local tombstone storage so it never resurfaces
+    addLocalTombstone(id, targetPhone);
+
     setSubmissions((prev) => {
       const updated = prev.filter((sub) => {
         if (sub.id === id) return false;
@@ -523,6 +594,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setSubmissions([]);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('nazazi_payment_submissions');
+      localStorage.removeItem('nazazi_deleted_tombstones');
     }
 
     try {
