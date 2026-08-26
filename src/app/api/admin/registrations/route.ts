@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err: unknown) {
+    console.error('GET /api/admin/registrations error:', err);
     const errorMsg = err instanceof Error ? err.message : 'Failed to fetch admin registrations';
     return NextResponse.json({ success: false, error: errorMsg }, { status: 500 });
   }

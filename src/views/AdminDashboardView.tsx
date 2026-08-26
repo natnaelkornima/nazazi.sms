@@ -670,18 +670,22 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Quick Sync Button */}
+          {/* Real-time Live Sync Indicator & Quick Refresh */}
           <button
             onClick={() => {
               fetchRegistrations();
-              info('Synced', 'Registrations refreshed & synced across all devices.');
+              info('Synced', 'Registrations refreshed & synchronized across all devices.');
             }}
             disabled={isLoading}
-            className="p-2 sm:px-3 sm:py-2.5 rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-all flex items-center gap-1.5 sm:gap-2 text-xs font-bold cursor-pointer group shadow-xs disabled:opacity-50"
-            title="Refresh & Cloud Sync"
+            className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 transition-all flex items-center gap-1.5 sm:gap-2 text-xs font-bold cursor-pointer group shadow-2xs disabled:opacity-50"
+            title="Auto-sync active every 3s. Click to force instant cloud refresh."
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-amber-500' : 'text-zinc-500'}`} />
-            <span className="hidden sm:inline">Sync</span>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-amber-500' : 'text-zinc-400 group-hover:text-zinc-600 dark:group-hover:text-zinc-200'}`} />
+            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 hidden md:inline">Live</span>
           </button>
 
           {/* Settings Menu Popover */}

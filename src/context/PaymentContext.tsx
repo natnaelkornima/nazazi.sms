@@ -18,7 +18,7 @@ interface PaymentContextType {
   isLoading: boolean;
   connectionInfo: DatabaseConnectionInfo;
   setSelectedPlanForCheckout: (plan: string | null) => void;
-  fetchRegistrations: () => Promise<void>;
+  fetchRegistrations: (silent?: boolean) => Promise<void>;
   submitPayment: (data: {
     id?: string;
     userName: string;
@@ -145,8 +145,10 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     };
   };
 
-  const fetchRegistrations = useCallback(async () => {
-    setIsLoading(true);
+  const fetchRegistrations = useCallback(async (silent = false) => {
+    if (!silent) {
+      setIsLoading(true);
+    }
     try {
       const headers = getAdminAuthHeaders();
       const res = await fetch('/api/admin/registrations', {
@@ -183,6 +185,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
               let effectivePlanName = item.planName;
               let effectiveAmount = item.amount;
+              // If local device has an explicit plan > 200 and server returned 200, preserve local
               if (prevItem && prevItem.amount > 200 && item.amount === 200) {
                 effectivePlanName = prevItem.planName;
                 effectiveAmount = prevItem.amount;
@@ -207,9 +210,9 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
               };
             });
 
-            // If local device has approved/rejected submissions, perform a single fast bulk sync to cloud
+            // If local device has approved/rejected submissions or customized plans, perform a fast bulk sync to cloud
             const localStatusesToSync = prev
-              .filter((p) => p.status === 'approved' || p.status === 'rejected')
+              .filter((p) => p.status === 'approved' || p.status === 'rejected' || p.amount > 200)
               .map((p) => ({
                 id: p.id,
                 phone: p.userPhone,
@@ -252,13 +255,40 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } catch (err) {
       console.warn('Live registrations fetch notice:', err);
     } finally {
-      setIsLoading(false);
+      if (!silent) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
-  // Initial load
+  // Automatic real-time background sync every 3 seconds across all devices
   useEffect(() => {
-    fetchRegistrations();
+    // Initial fetch
+    fetchRegistrations(false);
+
+    // Fast 3-second background polling
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
+      fetchRegistrations(true);
+    }, 3000);
+
+    // Instant sync when tab gains focus or screen turns on
+    const handleFocus = () => {
+      fetchRegistrations(true);
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', handleFocus);
+      document.addEventListener('visibilitychange', handleFocus);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', handleFocus);
+        document.removeEventListener('visibilitychange', handleFocus);
+      }
+    };
   }, [fetchRegistrations]);
 
   const submitPayment = async (data: {
@@ -391,6 +421,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers,
         body: JSON.stringify({ id, phone: targetPhone, status: 'approved' }),
       });
+      fetchRegistrations(true);
     } catch (err) {
       console.warn('Status update notice:', err);
     }
@@ -421,6 +452,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers,
         body: JSON.stringify({ id, phone: targetPhone, status: 'rejected' }),
       });
+      fetchRegistrations(true);
     } catch (err) {
       console.warn('Status update notice:', err);
     }
@@ -450,6 +482,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         headers,
         body: JSON.stringify({ id, phone: targetPhone, planName, amount }),
       });
+      fetchRegistrations(true);
     } catch (err) {
       console.warn('Plan update notice:', err);
     }
@@ -480,6 +513,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         method: 'DELETE',
         headers,
       });
+      fetchRegistrations(true);
     } catch (err) {
       console.warn('Delete registration notice:', err);
     }
@@ -497,6 +531,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         method: 'DELETE',
         headers,
       });
+      fetchRegistrations(true);
     } catch (err) {
       console.warn('Reset database notice:', err);
     }

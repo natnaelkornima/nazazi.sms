@@ -183,18 +183,60 @@ function loadStateFromDisk() {
 loadStateFromDisk();
 
 function recordPlanMeta(id: string | undefined, phone: string | undefined, planName: string, amount: number) {
+  if (!planName && (!amount || isNaN(amount))) return;
+  const meta = { planName, amount: isNaN(amount) ? 200 : amount };
+
   if (id) {
-    planMetaCache.set(id, { planName, amount });
+    planMetaCache.set(id, meta);
   }
-  const cleanPhone = normalizePhoneKey(phone);
-  if (cleanPhone) {
-    planMetaCache.set(cleanPhone, { planName, amount });
-    const last8 = cleanPhone.slice(-8);
-    if (last8.length >= 7) {
-      planMetaCache.set(last8, { planName, amount });
+  const rawPhone = (phone || '').trim();
+  if (rawPhone) {
+    planMetaCache.set(rawPhone, meta);
+    const cleanPhone = normalizePhoneKey(rawPhone);
+    if (cleanPhone) {
+      planMetaCache.set(cleanPhone, meta);
+    }
+    const canon = canonicalPhone(rawPhone);
+    if (canon) {
+      planMetaCache.set(canon, meta);
+    }
+    const rawDigits = rawPhone.replace(/\D/g, '');
+    if (rawDigits) {
+      planMetaCache.set(rawDigits, meta);
+    }
+    const last8 = rawDigits.slice(-8);
+    if (last8 && last8.length >= 7) {
+      planMetaCache.set(last8, meta);
+      planMetaCache.set(`09${last8}`, meta);
+      planMetaCache.set(`07${last8}`, meta);
+      planMetaCache.set(`+2519${last8}`, meta);
+      planMetaCache.set(`+2517${last8}`, meta);
+      planMetaCache.set(`2519${last8}`, meta);
+      planMetaCache.set(`2517${last8}`, meta);
     }
   }
   saveStateToDisk();
+}
+
+function getPlanMeta(id?: string, phone?: string): { planName: string; amount: number } | undefined {
+  const rawPhone = (phone || '').trim();
+  const cleanPhone = normalizePhoneKey(rawPhone);
+  const canon = rawPhone ? canonicalPhone(rawPhone) : '';
+  const rawDigits = rawPhone.replace(/\D/g, '');
+  const last8 = rawDigits.slice(-8);
+
+  return (
+    (id ? planMetaCache.get(id) : undefined) ||
+    (rawPhone ? planMetaCache.get(rawPhone) : undefined) ||
+    (cleanPhone ? planMetaCache.get(cleanPhone) : undefined) ||
+    (canon ? planMetaCache.get(canon) : undefined) ||
+    (rawDigits ? planMetaCache.get(rawDigits) : undefined) ||
+    (last8 && last8.length >= 7 ? planMetaCache.get(last8) : undefined) ||
+    (last8 && last8.length >= 7 ? planMetaCache.get(`09${last8}`) : undefined) ||
+    (last8 && last8.length >= 7 ? planMetaCache.get(`07${last8}`) : undefined) ||
+    (last8 && last8.length >= 7 ? planMetaCache.get(`+2519${last8}`) : undefined) ||
+    (last8 && last8.length >= 7 ? planMetaCache.get(`2519${last8}`) : undefined)
+  );
 }
 
 /**
@@ -275,15 +317,12 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
   );
 
   // Check if we have cached plan metadata for this phone / ID (e.g. user registered for 600 or 1000)
-  const cleanPhone = normalizePhoneKey(phoneStr);
-  const cachedPlan =
-    planMetaCache.get(idStr) ||
-    (cleanPhone ? planMetaCache.get(cleanPhone) : undefined) ||
-    (cleanPhone && cleanPhone.length >= 8 ? planMetaCache.get(cleanPhone.slice(-8)) : undefined);
-
-  if (cachedPlan && (cachedPlan.amount > 200 || !rawPlanValue || amountVal === 200)) {
-    planStr = cachedPlan.planName;
-    amountVal = cachedPlan.amount;
+  const cachedPlan = getPlanMeta(idStr, phoneStr);
+  if (cachedPlan) {
+    if (cachedPlan.amount > 200 || !rawPlanValue || amountVal === 200) {
+      planStr = cachedPlan.planName;
+      amountVal = cachedPlan.amount;
+    }
   }
 
   let rawStatus = String(
@@ -873,28 +912,32 @@ export async function getAllRegistrations(): Promise<{
       }
 
       const list: RegistrationRecord[] = data.map((row: unknown) => {
-        const r = row as Record<string, unknown>;
+        const r = (row && typeof row === 'object' ? row : {}) as Record<string, unknown>;
         const parsed = extractRowData(r);
-        const phoneStr = parsed.phone_number;
-        const cleanPhone = normalizePhoneKey(phoneStr);
-        const canon = canonicalPhone(phoneStr);
+        const phoneStr = String(parsed?.phone_number || '').trim();
+        const cleanPhone = phoneStr ? normalizePhoneKey(phoneStr) : '';
+        const canon = phoneStr ? canonicalPhone(phoneStr) : '';
         const rawDigits = phoneStr.replace(/\D/g, '');
         const last8 = rawDigits.slice(-8);
 
         // Check if there is an in-memory or cached plan metadata that has authentic amount (e.g. 600 or 1000)
         const memMatch = inMemoryRegistrations.find(
-          (m) => m.id === parsed.id || (cleanPhone && phoneMatches(m.phone_number, cleanPhone))
+          (m) => (parsed.id && m.id === parsed.id) || (cleanPhone && m?.phone_number && phoneMatches(m.phone_number, cleanPhone))
         );
+        const cachedPlan = getPlanMeta(parsed.id, phoneStr);
         let finalPlanName = parsed.plan_name;
         let finalAmount = parsed.amount;
 
-        if (memMatch && memMatch.amount > 200 && finalAmount === 200) {
+        if (cachedPlan && (cachedPlan.amount > 200 || finalAmount === 200 || !finalPlanName)) {
+          finalPlanName = cachedPlan.planName;
+          finalAmount = cachedPlan.amount;
+        } else if (memMatch && memMatch.amount > 200 && finalAmount === 200) {
           finalPlanName = memMatch.plan_name;
           finalAmount = memMatch.amount;
         }
 
         const cachedOverride =
-          statusOverridesMap.get(parsed.id) ||
+          (parsed.id ? statusOverridesMap.get(parsed.id) : undefined) ||
           (cleanPhone ? statusOverridesMap.get(cleanPhone) : undefined) ||
           (canon ? statusOverridesMap.get(canon) : undefined) ||
           (rawDigits ? statusOverridesMap.get(rawDigits) : undefined) ||
@@ -918,13 +961,14 @@ export async function getAllRegistrations(): Promise<{
 
       // Merge any pending/recent in-memory registrations that aren't in Supabase yet
       const combined = [...list];
-      const seenIds = new Set(list.map((r) => r.id));
-      const seenPhones = new Set(list.map((r) => normalizePhoneKey(r.phone_number)).filter(Boolean));
+      const seenIds = new Set(list.map((r) => r?.id).filter(Boolean));
+      const seenPhones = new Set(list.map((r) => r?.phone_number ? normalizePhoneKey(r.phone_number) : '').filter(Boolean));
 
       for (const mem of inMemoryRegistrations) {
-        const memPhone = normalizePhoneKey(mem.phone_number);
-        if (!seenIds.has(mem.id) && (!memPhone || !seenPhones.has(memPhone))) {
-          seenIds.add(mem.id);
+        if (!mem) continue;
+        const memPhone = mem.phone_number ? normalizePhoneKey(mem.phone_number) : '';
+        if ((!mem.id || !seenIds.has(mem.id)) && (!memPhone || !seenPhones.has(memPhone))) {
+          if (mem.id) seenIds.add(mem.id);
           if (memPhone) seenPhones.add(memPhone);
           combined.unshift(mem);
         }
