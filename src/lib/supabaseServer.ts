@@ -112,31 +112,45 @@ function normalizePhoneKey(phone: string): string {
 // Persistent map to track registered plans & amounts even if Supabase schema lacks plan columns
 const planMetaCache = new Map<string, { planName: string; amount: number }>();
 
+// Persistent tombstone set to permanently block deleted records from ever resurrecting from DB lag
+const deletedTombstonesMap = new Set<string>();
+
 const PRIMARY_DATA_DIR = path.join(process.cwd(), '.data');
 const PRIMARY_STATE_FILE = path.join(PRIMARY_DATA_DIR, 'nazazi_admin_state.json');
 const TMP_STATE_FILE = '/tmp/nazazi_admin_state.json';
+const PRIMARY_PLANS_FILE = path.join(PRIMARY_DATA_DIR, 'nazazi_plans.json');
+const TMP_PLANS_FILE = '/tmp/nazazi_plans.json';
+const PRIMARY_TOMBSTONES_FILE = path.join(PRIMARY_DATA_DIR, 'nazazi_deleted_tombstones.json');
+const TMP_TOMBSTONES_FILE = '/tmp/nazazi_deleted_tombstones.json';
 
 function saveStateToDisk() {
   try {
     const dataToSave = {
       statusOverrides: Array.from(statusOverridesMap.entries()),
       planMeta: Array.from(planMetaCache.entries()),
+      deletedTombstones: Array.from(deletedTombstonesMap.values()),
       inMemoryRegistrations,
       savedAt: new Date().toISOString(),
     };
     const jsonStr = JSON.stringify(dataToSave, null, 2);
+    const plansStr = JSON.stringify(Array.from(planMetaCache.entries()), null, 2);
+    const tombstonesStr = JSON.stringify(Array.from(deletedTombstonesMap.values()), null, 2);
 
     try {
       if (!fs.existsSync(PRIMARY_DATA_DIR)) {
         fs.mkdirSync(PRIMARY_DATA_DIR, { recursive: true });
       }
       fs.writeFileSync(PRIMARY_STATE_FILE, jsonStr, 'utf-8');
+      fs.writeFileSync(PRIMARY_PLANS_FILE, plansStr, 'utf-8');
+      fs.writeFileSync(PRIMARY_TOMBSTONES_FILE, tombstonesStr, 'utf-8');
     } catch {
       // Primary write failed, try /tmp
     }
 
     try {
       fs.writeFileSync(TMP_STATE_FILE, jsonStr, 'utf-8');
+      fs.writeFileSync(TMP_PLANS_FILE, plansStr, 'utf-8');
+      fs.writeFileSync(TMP_TOMBSTONES_FILE, tombstonesStr, 'utf-8');
     } catch {
       // tmp write fallback
     }
@@ -167,6 +181,13 @@ function loadStateFromDisk() {
               }
             }
           }
+          if (Array.isArray(parsed.deletedTombstones)) {
+            for (const t of parsed.deletedTombstones) {
+              if (t && typeof t === 'string') {
+                deletedTombstonesMap.add(t);
+              }
+            }
+          }
           if (Array.isArray(parsed.inMemoryRegistrations) && inMemoryRegistrations.length === 0) {
             inMemoryRegistrations = parsed.inMemoryRegistrations;
           }
@@ -177,10 +198,107 @@ function loadStateFromDisk() {
       // Continue to next candidate
     }
   }
+
+  // Also check individual dedicated files
+  const planFiles = [PRIMARY_PLANS_FILE, TMP_PLANS_FILE];
+  for (const pFile of planFiles) {
+    try {
+      if (fs.existsSync(pFile)) {
+        const raw = fs.readFileSync(pFile, 'utf-8');
+        if (raw) {
+          const entries = JSON.parse(raw);
+          if (Array.isArray(entries)) {
+            for (const [k, v] of entries) {
+              if (k && v && typeof v === 'object' && v.planName) {
+                planMetaCache.set(k, v);
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const tombstoneFiles = [PRIMARY_TOMBSTONES_FILE, TMP_TOMBSTONES_FILE];
+  for (const tFile of tombstoneFiles) {
+    try {
+      if (fs.existsSync(tFile)) {
+        const raw = fs.readFileSync(tFile, 'utf-8');
+        if (raw) {
+          const entries = JSON.parse(raw);
+          if (Array.isArray(entries)) {
+            for (const t of entries) {
+              if (t && typeof t === 'string') {
+                deletedTombstonesMap.add(t);
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
 }
 
 // Load persisted state immediately on server init
 loadStateFromDisk();
+
+export function isTombstoned(id?: string, phone?: string): boolean {
+  if (id && deletedTombstonesMap.has(id)) return true;
+  const rawPhone = (phone || '').trim();
+  if (!rawPhone) return false;
+
+  if (deletedTombstonesMap.has(rawPhone)) return true;
+  const cleanPhone = normalizePhoneKey(rawPhone);
+  if (cleanPhone && deletedTombstonesMap.has(cleanPhone)) return true;
+  const canon = canonicalPhone(rawPhone);
+  if (canon && deletedTombstonesMap.has(canon)) return true;
+  const rawDigits = rawPhone.replace(/\D/g, '');
+  if (rawDigits && deletedTombstonesMap.has(rawDigits)) return true;
+  const last8 = rawDigits.slice(-8);
+  if (last8 && last8.length >= 7) {
+    if (
+      deletedTombstonesMap.has(last8) ||
+      deletedTombstonesMap.has(`09${last8}`) ||
+      deletedTombstonesMap.has(`07${last8}`) ||
+      deletedTombstonesMap.has(`+2519${last8}`) ||
+      deletedTombstonesMap.has(`+2517${last8}`) ||
+      deletedTombstonesMap.has(`2519${last8}`) ||
+      deletedTombstonesMap.has(`2517${last8}`)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function removeTombstone(id?: string, phone?: string) {
+  if (id) deletedTombstonesMap.delete(id);
+  const rawPhone = (phone || '').trim();
+  if (rawPhone) {
+    deletedTombstonesMap.delete(rawPhone);
+    const cleanPhone = normalizePhoneKey(rawPhone);
+    if (cleanPhone) deletedTombstonesMap.delete(cleanPhone);
+    const canon = canonicalPhone(rawPhone);
+    if (canon) deletedTombstonesMap.delete(canon);
+    const rawDigits = rawPhone.replace(/\D/g, '');
+    if (rawDigits) deletedTombstonesMap.delete(rawDigits);
+    const last8 = rawDigits.slice(-8);
+    if (last8 && last8.length >= 7) {
+      deletedTombstonesMap.delete(last8);
+      deletedTombstonesMap.delete(`09${last8}`);
+      deletedTombstonesMap.delete(`07${last8}`);
+      deletedTombstonesMap.delete(`+2519${last8}`);
+      deletedTombstonesMap.delete(`+2517${last8}`);
+      deletedTombstonesMap.delete(`2519${last8}`);
+      deletedTombstonesMap.delete(`2517${last8}`);
+    }
+  }
+  saveStateToDisk();
+}
 
 function recordPlanMeta(id: string | undefined, phone: string | undefined, planName: string, amount: number) {
   if (!planName && (!amount || isNaN(amount))) return;
@@ -471,7 +589,10 @@ export async function saveRegistrationToSupabase(data: {
     created_at: nowIso,
   };
 
-  // Record plan metadata in memory cache
+  // Un-tombstone phone if user is submitting a new registration
+  removeTombstone(undefined, record.phone_number);
+
+  // Record plan metadata in memory cache and flush to disk
   recordPlanMeta(fallbackId, record.phone_number, record.plan_name, record.amount);
 
   // Always keep in-memory cache updated immediately
@@ -565,6 +686,20 @@ export async function saveRegistrationToSupabase(data: {
     // Status column
     if (knownCols.size === 0 || knownCols.has('status')) {
       smartPayload.status = record.status;
+    }
+
+    // Embed plan note tag into notes / description / remark / comment if present
+    const planNoteTag = `[PLAN: ${record.plan_name} | AMOUNT: ${record.amount}]`;
+    if (knownCols.has('notes')) {
+      smartPayload.notes = planNoteTag;
+    } else if (knownCols.has('description')) {
+      smartPayload.description = planNoteTag;
+    } else if (knownCols.has('remark')) {
+      smartPayload.remark = planNoteTag;
+    } else if (knownCols.has('comment')) {
+      smartPayload.comment = planNoteTag;
+    } else if (knownCols.has('details')) {
+      smartPayload.details = planNoteTag;
     }
 
     // Try inserting tailored payload
@@ -710,6 +845,7 @@ export async function saveRegistrationToSupabase(data: {
 export async function getRegistrationByPhone(phone: string): Promise<RegistrationRecord | null> {
   const rawInput = (phone || '').trim();
   if (!rawInput) return null;
+  if (isTombstoned(undefined, rawInput)) return null;
 
   const canonical = canonicalPhone(rawInput);
   const cleanDigits = rawInput.replace(/\D/g, '');
@@ -1149,15 +1285,60 @@ export async function deleteRegistration(
 ): Promise<{ success: boolean; error?: string }> {
   if (id) {
     statusOverridesMap.delete(id);
+    planMetaCache.delete(id);
+    deletedTombstonesMap.add(id);
   }
-  const cleanPhone = phoneNumber ? normalizePhoneKey(phoneNumber) : '';
-  if (cleanPhone) {
-    statusOverridesMap.delete(cleanPhone);
+  const rawPhone = (phoneNumber || '').trim();
+  if (rawPhone) {
+    statusOverridesMap.delete(rawPhone);
+    planMetaCache.delete(rawPhone);
+    deletedTombstonesMap.add(rawPhone);
+
+    const cleanPhone = normalizePhoneKey(rawPhone);
+    if (cleanPhone) {
+      statusOverridesMap.delete(cleanPhone);
+      planMetaCache.delete(cleanPhone);
+      deletedTombstonesMap.add(cleanPhone);
+    }
+    const canon = canonicalPhone(rawPhone);
+    if (canon) {
+      statusOverridesMap.delete(canon);
+      planMetaCache.delete(canon);
+      deletedTombstonesMap.add(canon);
+    }
+    const rawDigits = rawPhone.replace(/\D/g, '');
+    if (rawDigits) {
+      statusOverridesMap.delete(rawDigits);
+      planMetaCache.delete(rawDigits);
+      deletedTombstonesMap.add(rawDigits);
+    }
+    const last8 = rawDigits.slice(-8);
+    if (last8 && last8.length >= 7) {
+      deletedTombstonesMap.add(last8);
+      deletedTombstonesMap.add(`09${last8}`);
+      deletedTombstonesMap.add(`07${last8}`);
+      deletedTombstonesMap.add(`+2519${last8}`);
+      deletedTombstonesMap.add(`+2517${last8}`);
+      deletedTombstonesMap.add(`2519${last8}`);
+      deletedTombstonesMap.add(`2517${last8}`);
+
+      statusOverridesMap.delete(last8);
+      statusOverridesMap.delete(`09${last8}`);
+      statusOverridesMap.delete(`07${last8}`);
+      statusOverridesMap.delete(`+2519${last8}`);
+      statusOverridesMap.delete(`2519${last8}`);
+      planMetaCache.delete(last8);
+      planMetaCache.delete(`09${last8}`);
+      planMetaCache.delete(`07${last8}`);
+      planMetaCache.delete(`+2519${last8}`);
+      planMetaCache.delete(`2519${last8}`);
+    }
   }
 
   inMemoryRegistrations = inMemoryRegistrations.filter((r) => {
     if (id && r.id === id) return false;
-    if (cleanPhone && normalizePhoneKey(r.phone_number) === cleanPhone) return false;
+    if (rawPhone && phoneMatches(r.phone_number, rawPhone)) return false;
+    if (isTombstoned(r.id, r.phone_number)) return false;
     return true;
   });
 
@@ -1198,6 +1379,7 @@ export async function resetAllRegistrations(): Promise<{ success: boolean; count
   inMemoryRegistrations = [];
   statusOverridesMap.clear();
   planMetaCache.clear();
+  deletedTombstonesMap.clear();
   saveStateToDisk();
 
   const client = getSupabaseClient();
