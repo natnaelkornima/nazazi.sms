@@ -117,9 +117,75 @@ Open [http://localhost:3000](http://localhost:3000) with your browser.
 
 ---
 
-## 🚢 Safe Deployment
+## 🐙 GitHub Push & Setup
 
-When deploying to platforms such as Vercel, Cloud Run, or AWS:
-1. Ensure all **Server-Only** environment variables are configured in the host's secret manager or environment settings.
-2. Never inject `SUPABASE_SERVICE_ROLE_KEY` or `CLOUDINARY_API_SECRET` with the `NEXT_PUBLIC_` prefix.
-3. Configure `ADMIN_PASSWORD` and `ADMIN_AUTH_SECRET` in production secrets.
+Follow these steps to initialize and push your code to your GitHub repository:
+
+### 1. Initialize & Check Status
+```bash
+# If not already a git repository
+git init
+
+# Check changed files
+git status
+```
+
+### 2. Stage and Commit
+```bash
+git add .
+git commit -m "feat: complete Nazazi SMS platform with Netlify configuration"
+```
+
+### 3. Link Remote Repository and Push
+```bash
+# Rename branch to main if needed
+git branch -M main
+
+# Link to your GitHub repository (replace with your repository URL)
+git remote add origin https://github.com/natnaelkornima/nazazi.sms.git
+# Or if origin already exists:
+# git remote set-url origin https://github.com/natnaelkornima/nazazi.sms.git
+
+# Push to GitHub
+git push -u origin main
+```
+
+---
+
+## 🌐 Netlify Deployment Guide
+
+This project is configured with `netlify.toml` and `@netlify/plugin-nextjs` for seamless zero-config Netlify hosting with full App Router and Serverless API support.
+
+### Step 1: Import Project to Netlify
+1. Log in to [Netlify](https://app.netlify.com/).
+2. Click **"Add new site"** → **"Import an existing project"**.
+3. Choose **GitHub** and authorize access to your `natnaelkornima/nazazi.sms` repository.
+4. Select the `main` branch.
+
+### Step 2: Build Settings
+Netlify will automatically detect the settings from `netlify.toml`:
+- **Build command**: `npm run build`
+- **Publish directory**: `.next`
+- **Plugin**: `@netlify/plugin-nextjs`
+
+### Step 3: Configure Environment Variables
+In the Netlify dashboard under **Site configuration** → **Environment variables**, add the following:
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase Project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase Anon Public Key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase Service Role Key |
+| `CLOUDINARY_CLOUD_NAME` | Cloudinary Cloud Name |
+| `CLOUDINARY_API_KEY` | Cloudinary API Key |
+| `CLOUDINARY_API_SECRET` | Cloudinary API Secret |
+| `ADMIN_PASSWORD` | Admin password for `/` admin gate |
+| `ADMIN_AUTH_SECRET` | 32+ character random string for signing admin JWT/HMAC tokens |
+| `GEMINI_API_KEY` | Google Gemini API key |
+
+### Step 4: Deploy
+Click **"Deploy site"**. Netlify will build the application and provide a live URL (e.g. `https://nazazi-sms.netlify.app`). Any future `git push` to your `main` branch will automatically trigger a new deployment.
+
+---
+
+## 🚢 Safe Deployment Best Practices

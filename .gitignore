@@ -35,8 +35,10 @@ yarn-error.log*
 # Keep example environment file tracked
 !.env.example
 
-# Vercel & IDE
+# Vercel, Netlify & IDE
 .vercel
+.netlify/
+.data/
 .idea/
 .vscode/
 *.swp
