@@ -1162,8 +1162,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Mobile View: Modern Cards Layout (Visible only on < md screens) */}
-              <div className="grid grid-cols-1 gap-2.5 md:hidden">
+              {/* Mobile View: High-Efficiency Two-Column Card Layout (Info on Left, Receipt on Right) */}
+              <div className="grid grid-cols-1 gap-3 md:hidden">
                 {paginatedSubmissions.map((sub, pageIndex) => {
                   const absoluteIndex = startIndex + pageIndex + 1;
                   const isSelected = selectedIds.includes(sub.id);
@@ -1174,189 +1174,209 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                       onClick={() => {
                         if (isSelectionMode) handleToggleSelect(sub.id);
                       }}
-                      className={`p-3 rounded-xl border transition-all space-y-2.5 ${
+                      className={`p-3 rounded-xl border transition-all ${
                         isSelected
                           ? 'bg-zinc-100/90 dark:bg-zinc-800 border-zinc-900 dark:border-zinc-100 shadow-2xs'
                           : 'bg-white dark:bg-zinc-900/80 border-zinc-200 dark:border-zinc-800'
                       }`}
                     >
-                      {/* Card Header: Index/Select, Name, Status */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          {(isSelectionMode || selectedIds.length > 0) && (
+                      {/* Main Card Layout: Left Info & Actions, Right Receipt Thumbnail */}
+                      <div className="flex items-stretch gap-3">
+                        {/* LEFT COLUMN: User Info, Plan Selector, Status, & Quick Actions */}
+                        <div className="flex-1 min-w-0 flex flex-col justify-between space-y-2">
+                          {/* Header: Select Checkbox, #Index, Name & Status */}
+                          <div>
+                            <div className="flex items-center justify-between gap-1.5 mb-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                {(isSelectionMode || selectedIds.length > 0) && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleToggleSelect(sub.id);
+                                    }}
+                                    className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer border shrink-0 ${
+                                      isSelected
+                                        ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-2xs'
+                                        : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800'
+                                    }`}
+                                    aria-label={isSelected ? 'Deselect member' : 'Select member'}
+                                  >
+                                    {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                  </button>
+                                )}
+                                <span className="text-[11px] font-mono font-bold text-zinc-400 dark:text-zinc-500 shrink-0">
+                                  #{absoluteIndex}
+                                </span>
+                                <h3 className="font-bold text-zinc-900 dark:text-zinc-100 text-sm leading-tight truncate" title={sub.userName}>
+                                  {sub.userName}
+                                </h3>
+                              </div>
+
+                              <div className="shrink-0">
+                                {sub.status === 'pending' && <Badge variant="amber" dot>Pending</Badge>}
+                                {sub.status === 'approved' && <Badge variant="zinc" dot>Approved</Badge>}
+                                {sub.status === 'rejected' && <Badge variant="danger">Rejected</Badge>}
+                              </div>
+                            </div>
+
+                            {/* Phone & Date */}
+                            <div className="flex items-center justify-between text-[11px] font-mono text-zinc-600 dark:text-zinc-300 font-semibold gap-1">
+                              <span className="flex items-center gap-1 truncate">
+                                <Smartphone className="w-3 h-3 text-zinc-400 shrink-0" />
+                                {sub.userPhone}
+                              </span>
+                              <span className="text-[10px] text-zinc-400 font-normal shrink-0">
+                                {new Date(sub.submittedAt).toLocaleDateString([], { month: 'numeric', day: 'numeric' })}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Plan Selector & Amount Display */}
+                          <div className="flex items-center gap-2">
+                            <div className="relative inline-flex items-center flex-1 min-w-0">
+                              <select
+                                value={sub.amount >= 1000 ? '1000' : sub.amount >= 600 ? '600' : '200'}
+                                onChange={async (e) => {
+                                  const val = Number(e.target.value);
+                                  const newPlanName =
+                                    val === 1000
+                                      ? '6 Months Access (1,000 Birr)'
+                                      : val === 600
+                                      ? '3 Months Access (600 Birr)'
+                                      : '1 Month Access (200 Birr)';
+                                  await updatePaymentPlan(sub.id, newPlanName, val, sub.userPhone);
+                                  success('Plan Updated', `Set to ${val} ETB for ${sub.userName}`);
+                                }}
+                                className={`w-full text-[10px] font-extrabold uppercase py-1 pl-2 pr-5 rounded-md border appearance-none cursor-pointer ${
+                                  sub.amount >= 1000 || sub.planName.toLowerCase().includes('6')
+                                    ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                                    : sub.amount >= 600 || sub.planName.toLowerCase().includes('3')
+                                    ? 'bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                                    : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700'
+                                }`}
+                                title="Change plan tier"
+                              >
+                                <option value="200" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                  1 Mo • 200 ETB
+                                </option>
+                                <option value="600" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                  3 Mo • 600 ETB
+                                </option>
+                                <option value="1000" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
+                                  6 Mo • 1k ETB
+                                </option>
+                              </select>
+                              <ChevronDown className="w-2.5 h-2.5 absolute right-1 pointer-events-none opacity-60" />
+                            </div>
+                          </div>
+
+                          {/* Quick Action Buttons on Left */}
+                          <div className="flex items-center gap-1.5 pt-1">
+                            {sub.status === 'pending' && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    approvePayment(sub.id, sub.userPhone);
+                                    success('Approved!', `Activated for ${sub.userPhone}`);
+                                  }}
+                                  className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all cursor-pointer shadow-2xs"
+                                  title="Approve registration"
+                                >
+                                  <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Approve
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    rejectPayment(sub.id, sub.userPhone);
+                                    info('Rejected', `Marked ${sub.userPhone} as rejected`);
+                                  }}
+                                  className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 transition-all cursor-pointer border border-rose-200 dark:border-rose-900"
+                                  title="Reject registration"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+
+                            {sub.status === 'approved' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedPhone(sub.userPhone);
+                                  setActiveTab('send_sms');
+                                  setTargetType('single_member');
+                                }}
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
+                              >
+                                <Send className="w-3 h-3" /> Send SMS
+                              </button>
+                            )}
+
+                            {sub.status === 'rejected' && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  approvePayment(sub.id, sub.userPhone);
+                                  success('Approved', `Status updated to active for ${sub.userPhone}`);
+                                }}
+                                className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
+                              >
+                                <Check className="w-3 h-3" /> Re-Approve
+                              </button>
+                            )}
+
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleToggleSelect(sub.id);
+                                setItemToDelete(sub);
                               }}
-                              className={`w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer border ${
-                                isSelected
-                                  ? 'bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 border-zinc-900 dark:border-white shadow-2xs'
-                                  : 'border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800'
-                              }`}
-                              aria-label={isSelected ? 'Deselect member' : 'Select member'}
+                              className="p-1.5 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer shrink-0"
+                              title="Delete this record"
+                              aria-label="Delete registration"
                             >
-                              {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
-                          )}
-                          <span className="text-[11px] font-mono font-bold text-zinc-400 dark:text-zinc-500">
-                            #{absoluteIndex}
-                          </span>
-                          <div>
-                            <h3 className="font-bold text-zinc-900 dark:text-zinc-100 text-sm leading-tight">
-                              {sub.userName}
-                            </h3>
-                            <p className="text-[11px] font-mono text-zinc-600 dark:text-zinc-300 font-semibold flex items-center gap-1">
-                              <Smartphone className="w-3 h-3 text-zinc-400" /> {sub.userPhone}
-                            </p>
                           </div>
                         </div>
 
-                        <div>
-                          {sub.status === 'pending' && <Badge variant="amber" dot>Pending</Badge>}
-                          {sub.status === 'approved' && <Badge variant="zinc" dot>Approved</Badge>}
-                          {sub.status === 'rejected' && <Badge variant="danger">Rejected</Badge>}
-                        </div>
-                      </div>
-
-                      {/* Card Body: Plan Selector, Receipt thumbnail, Date */}
-                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 text-xs">
-                        {/* Plan & Amount Select */}
-                        <div className="flex items-center gap-1.5">
-                          <div className="relative inline-flex items-center">
-                            <select
-                              value={sub.amount >= 1000 ? '1000' : sub.amount >= 600 ? '600' : '200'}
-                              onChange={async (e) => {
-                                const val = Number(e.target.value);
-                                const newPlanName =
-                                  val === 1000
-                                    ? '6 Months Access (1,000 Birr)'
-                                    : val === 600
-                                    ? '3 Months Access (600 Birr)'
-                                    : '1 Month Access (200 Birr)';
-                                await updatePaymentPlan(sub.id, newPlanName, val, sub.userPhone);
-                                success('Plan Updated', `Set to ${val} ETB for ${sub.userName}`);
-                              }}
-                              className={`text-[10px] font-extrabold uppercase py-1 pl-2 pr-5 rounded-md border appearance-none cursor-pointer ${
-                                sub.amount >= 1000 || sub.planName.toLowerCase().includes('6')
-                                  ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border-amber-300 dark:border-amber-800'
-                                  : sub.amount >= 600 || sub.planName.toLowerCase().includes('3')
-                                  ? 'bg-purple-100 text-purple-900 dark:bg-purple-950/80 dark:text-purple-300 border-purple-300 dark:border-purple-800'
-                                  : 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 border-zinc-200 dark:border-zinc-700'
-                              }`}
-                              title="Change plan tier"
-                            >
-                              <option value="200" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
-                                1 Mo • 200 ETB
-                              </option>
-                              <option value="600" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
-                                3 Mo • 600 ETB
-                              </option>
-                              <option value="1000" className="bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 font-sans">
-                                6 Mo • 1k ETB
-                              </option>
-                            </select>
-                            <ChevronDown className="w-2.5 h-2.5 absolute right-1 pointer-events-none opacity-60" />
-                          </div>
-                        </div>
-
-                        {/* Receipt preview button */}
-                        <div className="flex items-center gap-2">
+                        {/* RIGHT COLUMN: Direct Visible Receipt Image / Thumbnail */}
+                        <div className="w-24 sm:w-28 shrink-0 flex flex-col items-center justify-center">
                           {sub.screenshotUrl ? (
-                            <button
-                              type="button"
+                            <div
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setPreviewSubmission(sub);
                               }}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700"
-                              title="View receipt screenshot"
+                              className="relative w-full h-full min-h-[112px] rounded-xl overflow-hidden border-2 border-zinc-200 dark:border-zinc-700 bg-zinc-950 cursor-pointer group shadow-xs flex items-center justify-center"
+                              title="Tap to enlarge receipt"
                             >
-                              <Eye className="w-3 h-3 text-zinc-500" /> Receipt
-                            </button>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={sub.screenshotUrl}
+                                alt={`Receipt for ${sub.userName}`}
+                                referrerPolicy="no-referrer"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                              />
+                              <div className="absolute inset-0 bg-black/30 flex flex-col items-center justify-end p-1.5">
+                                <div className="w-full py-0.5 px-1 rounded-md bg-black/60 backdrop-blur-xs text-white text-[9px] font-bold flex items-center justify-center gap-1">
+                                  <Eye className="w-2.5 h-2.5" /> View
+                                </div>
+                              </div>
+                            </div>
                           ) : (
-                            <span className="text-[10px] text-zinc-400 italic">No receipt</span>
+                            <div className="w-full h-full min-h-[112px] rounded-xl border border-dashed border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/40 flex flex-col items-center justify-center p-2 text-center text-zinc-400">
+                              <FileText className="w-5 h-5 text-zinc-300 dark:text-zinc-600 mb-1" />
+                              <span className="text-[10px] italic">No receipt</span>
+                            </div>
                           )}
-
-                          <span className="text-[10px] font-mono text-zinc-400">
-                            {new Date(sub.submittedAt).toLocaleDateString([], { month: 'numeric', day: 'numeric' })}
-                          </span>
                         </div>
-                      </div>
-
-                      {/* Card Footer: Action Buttons (Large, touch-friendly icon/label buttons) */}
-                      <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                        {sub.status === 'pending' && (
-                          <div className="flex items-center gap-1.5 w-full">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                approvePayment(sub.id, sub.userPhone);
-                                success('Approved!', `Activated for ${sub.userPhone}`);
-                              }}
-                              className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition-all cursor-pointer shadow-2xs"
-                              title="Approve registration"
-                            >
-                              <Check className="w-3.5 h-3.5 stroke-[2.5]" /> Approve
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                rejectPayment(sub.id, sub.userPhone);
-                                info('Rejected', `Marked ${sub.userPhone} as rejected`);
-                              }}
-                              className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 transition-all cursor-pointer border border-rose-200 dark:border-rose-900"
-                              title="Reject registration"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-
-                        {sub.status === 'approved' && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedPhone(sub.userPhone);
-                              setActiveTab('send_sms');
-                              setTargetType('single_member');
-                            }}
-                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg text-xs font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
-                          >
-                            <Send className="w-3 h-3" /> Send SMS
-                          </button>
-                        )}
-
-                        {sub.status === 'rejected' && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              approvePayment(sub.id, sub.userPhone);
-                              success('Approved', `Status updated to active for ${sub.userPhone}`);
-                            }}
-                            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/50 transition-colors cursor-pointer border border-emerald-200 dark:border-emerald-800"
-                          >
-                            <Check className="w-3 h-3" /> Re-Approve
-                          </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setItemToDelete(sub);
-                          }}
-                          className="p-1.5 text-zinc-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-lg transition-colors cursor-pointer"
-                          title="Delete this record"
-                          aria-label="Delete registration"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     </div>
                   );

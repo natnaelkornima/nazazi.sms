@@ -451,6 +451,14 @@ function extractRowData(row: Record<string, unknown>, fallbackId?: string): Regi
     row.status || row.state || row.subscription_status || row.payment_status || ''
   ).toLowerCase().trim();
 
+  // If status column was blank or null, check if notes/description has [STATUS: ...] tag
+  if (!rawStatus && typeof rawNotesValue === 'string') {
+    const statusMatch = rawNotesValue.match(/\[STATUS:\s*([a-zA-Z]+)/i);
+    if (statusMatch) {
+      rawStatus = statusMatch[1].toLowerCase().trim();
+    }
+  }
+
   let status: 'pending' | 'approved' | 'rejected' = 'pending';
 
   if (
@@ -1149,6 +1157,7 @@ export async function updateRegistrationPlan(
   phoneNumber?: string
 ): Promise<{ success: boolean; error?: string }> {
   const rawPhone = (phoneNumber || '').trim();
+  const canonical = canonicalPhone(rawPhone);
   recordPlanMeta(id, rawPhone, planName, amount);
 
   inMemoryRegistrations = inMemoryRegistrations.map((r) => {
@@ -1157,6 +1166,8 @@ export async function updateRegistrationPlan(
     }
     return r;
   });
+
+  saveStateToDisk();
 
   const client = getSupabaseClient();
   if (!client) {
@@ -1177,27 +1188,43 @@ export async function updateRegistrationPlan(
   ];
   const cleanDigits = rawPhone.replace(/\D/g, '');
   const last8 = cleanDigits.slice(-8);
+  const planNoteTag = `[PLAN: ${planName} | AMOUNT: ${amount}]`;
+
+  const payloads = [
+    { plan_name: planName, amount: amount },
+    { plan: planName, amount: amount },
+    { plan_name: planName, price: amount },
+    { plan_name: planName },
+    { amount: amount },
+    { notes: planNoteTag },
+    { description: planNoteTag },
+  ];
 
   for (const tableName of candidateTables) {
     try {
-      const payloads = [
-        { plan_name: planName, amount: amount },
-        { plan: planName, amount: amount },
-        { plan_name: planName, price: amount },
-        { plan_name: planName },
-        { amount: amount },
-      ];
-
       for (const p of payloads) {
+        let updated = false;
         if (id && !id.startsWith('reg_')) {
           const { error } = await client.from(tableName).update(p).eq('id', id);
-          if (!error) break;
-        } else if (last8 && last8.length >= 7) {
+          if (!error) updated = true;
+        }
+        if (!updated && (rawPhone || canonical || (last8 && last8.length >= 7))) {
           for (const phoneCol of ['phone_number', 'phone', 'user_phone', 'mobile']) {
-            const { error } = await client.from(tableName).update(p).ilike(phoneCol, `%${last8}%`);
-            if (!error) break;
+            if (rawPhone) {
+              const { error: err1 } = await client.from(tableName).update(p).eq(phoneCol, rawPhone);
+              if (!err1) { updated = true; break; }
+            }
+            if (canonical) {
+              const { error: err2 } = await client.from(tableName).update(p).eq(phoneCol, canonical);
+              if (!err2) { updated = true; break; }
+            }
+            if (last8 && last8.length >= 7) {
+              const { error: err3 } = await client.from(tableName).update(p).ilike(phoneCol, `%${last8}%`);
+              if (!err3) { updated = true; break; }
+            }
           }
         }
+        if (updated) break;
       }
     } catch (err) {
       console.warn(`Plan update notice for ${tableName}:`, err);
@@ -1254,27 +1281,44 @@ export async function updateRegistrationStatus(
     return { success: true };
   }
 
-  // Attempt database update asynchronously / without hanging
+  // Attempt database update in Supabase
   const candidateTables = ['registrations', 'payments', 'subscriptions', 'subscribers', 'users', 'members'];
   const updatePayloads = [
     { status, reviewed_at: nowIso },
     { status },
+    { is_approved: status === 'approved', approved: status === 'approved', is_rejected: status === 'rejected', rejected: status === 'rejected' },
+    { notes: `[STATUS: ${status} | REVIEWED_AT: ${nowIso}]` },
+    { description: `[STATUS: ${status} | REVIEWED_AT: ${nowIso}]` },
   ];
 
   for (const tableName of candidateTables) {
     try {
       for (const payload of updatePayloads) {
+        let updated = false;
         if (id && !id.startsWith('reg_')) {
           const { error } = await client.from(tableName).update(payload).eq('id', id);
-          if (!error) break;
+          if (!error) updated = true;
         }
-        if (rawPhone) {
-          const { error } = await client.from(tableName).update(payload).eq('phone_number', rawPhone);
-          if (!error) break;
+        if (!updated && (rawPhone || canonical || (last8 && last8.length >= 7))) {
+          for (const phoneCol of ['phone_number', 'phone', 'user_phone', 'mobile']) {
+            if (rawPhone) {
+              const { error: err1 } = await client.from(tableName).update(payload).eq(phoneCol, rawPhone);
+              if (!err1) { updated = true; break; }
+            }
+            if (canonical) {
+              const { error: err2 } = await client.from(tableName).update(payload).eq(phoneCol, canonical);
+              if (!err2) { updated = true; break; }
+            }
+            if (last8 && last8.length >= 7) {
+              const { error: err3 } = await client.from(tableName).update(payload).ilike(phoneCol, `%${last8}%`);
+              if (!err3) { updated = true; break; }
+            }
+          }
         }
+        if (updated) break;
       }
     } catch {
-      // Ignore schema column errors as statusOverridesMap guarantees real-time persistence across all devices
+      // Ignore schema column errors
     }
   }
 
@@ -1462,10 +1506,15 @@ export async function batchSyncRegistrations(
         statusOverridesMap.set(`2519${last8}`, overrideObj);
       }
       updatedCount++;
+
+      // Asynchronously update Supabase database row
+      updateRegistrationStatus(item.id || '', item.status, rawPhone).catch(() => {});
     }
 
     if (item.planName && typeof item.amount === 'number') {
       recordPlanMeta(item.id, rawPhone, item.planName, item.amount);
+      // Asynchronously update Supabase database row
+      updateRegistrationPlan(item.id || '', item.planName, item.amount, rawPhone).catch(() => {});
     }
   }
 
