@@ -300,6 +300,10 @@ export function removeTombstone(id?: string, phone?: string) {
   saveStateToDisk();
 }
 
+export function getDeletedTombstonesList(): string[] {
+  return Array.from(deletedTombstonesMap);
+}
+
 function recordPlanMeta(id: string | undefined, phone: string | undefined, planName: string, amount: number) {
   if (!planName && (!amount || isNaN(amount))) return;
   const meta = { planName, amount: isNaN(amount) ? 200 : amount };
@@ -1110,6 +1114,7 @@ export async function getAllRegistrations(): Promise<{
 
       for (const mem of inMemoryRegistrations) {
         if (!mem) continue;
+        if (isTombstoned(mem.id, mem.phone_number)) continue;
         const memPhone = mem.phone_number ? normalizePhoneKey(mem.phone_number) : '';
         if ((!mem.id || !seenIds.has(mem.id)) && (!memPhone || !seenPhones.has(memPhone))) {
           if (mem.id) seenIds.add(mem.id);
@@ -1423,6 +1428,9 @@ export async function batchSyncRegistrations(
 
   for (const item of records) {
     const rawPhone = item.phone || item.phoneNumber || item.userPhone;
+    if (isTombstoned(item.id, rawPhone)) {
+      continue;
+    }
     const cleanPhone = normalizePhoneKey(rawPhone || '');
     const canon = rawPhone ? canonicalPhone(rawPhone) : '';
     const rawDigits = (rawPhone || '').replace(/\D/g, '');

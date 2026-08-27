@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -35,9 +35,50 @@ export default function RegisterPage() {
   // Form State (name, phone_number, plan, and payment image)
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [selectedPlan, setSelectedPlan] = useState('6m');
+  const [selectedPlan, setSelectedPlan] = useState<'1m' | '3m' | '6m'>('6m');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+
+  // Restore or parse plan on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const p = params.get('plan') || params.get('plan_name') || params.get('tier');
+        if (p) {
+          const lower = p.toLowerCase();
+          if (lower.includes('1m') || lower.includes('200')) {
+            setSelectedPlan('1m');
+            sessionStorage.setItem('nazazi_selected_plan_id', '1m');
+            localStorage.setItem('nazazi_selected_plan_id', '1m');
+          } else if (lower.includes('3m') || lower.includes('600')) {
+            setSelectedPlan('3m');
+            sessionStorage.setItem('nazazi_selected_plan_id', '3m');
+            localStorage.setItem('nazazi_selected_plan_id', '3m');
+          } else if (lower.includes('6m') || lower.includes('1000') || lower.includes('1,000')) {
+            setSelectedPlan('6m');
+            sessionStorage.setItem('nazazi_selected_plan_id', '6m');
+            localStorage.setItem('nazazi_selected_plan_id', '6m');
+          }
+        } else {
+          const stored = sessionStorage.getItem('nazazi_selected_plan_id') || localStorage.getItem('nazazi_selected_plan_id');
+          if (stored === '1m' || stored === '3m' || stored === '6m') {
+            setSelectedPlan(stored);
+          }
+        }
+      } catch {}
+    }
+  }, []);
+
+  const handlePlanSelect = (pId: '1m' | '3m' | '6m') => {
+    setSelectedPlan(pId);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('nazazi_selected_plan_id', pId);
+        localStorage.setItem('nazazi_selected_plan_id', pId);
+      } catch {}
+    }
+  };
 
   // Interaction State
   const [nameTouched, setNameTouched] = useState(false);
@@ -184,8 +225,18 @@ export default function RegisterPage() {
       formData.append('amount', String(planAmountNum));
       formData.append('payment_image', fileToUpload);
 
-      const response = await fetch('/api/register', {
+      const registerUrl = new URL('/api/register', typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+      registerUrl.searchParams.set('plan_name', planNameStr);
+      registerUrl.searchParams.set('amount', String(planAmountNum));
+      registerUrl.searchParams.set('plan_id', selectedPlan);
+
+      const response = await fetch(registerUrl.toString(), {
         method: 'POST',
+        headers: {
+          'X-Plan-Name': encodeURIComponent(planNameStr),
+          'X-Plan-Amount': String(planAmountNum),
+          'X-Plan-Id': selectedPlan,
+        },
         body: formData,
       });
 
@@ -405,7 +456,7 @@ export default function RegisterPage() {
                         <button
                           key={p.id}
                           type="button"
-                          onClick={() => setSelectedPlan(p.id)}
+                          onClick={() => handlePlanSelect(p.id as '1m' | '3m' | '6m')}
                           className={`relative p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
                             selectedPlan === p.id
                               ? 'border-white bg-zinc-800 text-white shadow-xs'

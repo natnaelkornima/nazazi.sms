@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { uploadPaymentImageToCloudinary } from '@/lib/cloudinaryServer';
 import { saveRegistrationToSupabase } from '@/lib/supabaseServer';
 import { validateFullName, validateEthiopianPhone } from '@/lib/validation';
+import { normalizePlanAndAmount } from '@/lib/planUtils';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,8 +13,30 @@ export async function POST(req: NextRequest) {
     let name: string | null = null;
     let phoneNumber: string | null = null;
     let paymentImage: unknown = null;
-    let planName = 'Standard Plan (200 Birr)';
-    let amount = 200;
+    
+    // Extract plan & amount hints from query parameters & headers (crucial for Instagram WebViews)
+    const { searchParams } = new URL(req.url);
+    const queryPlan = searchParams.get('plan_name') || searchParams.get('plan') || searchParams.get('planName') || searchParams.get('tier');
+    const queryAmount = searchParams.get('amount') || searchParams.get('price');
+    const queryPlanId = searchParams.get('plan_id') || searchParams.get('planId');
+
+    const headerPlan = req.headers.get('x-plan-name') ? decodeURIComponent(req.headers.get('x-plan-name') || '') : null;
+    const headerAmount = req.headers.get('x-plan-amount') || req.headers.get('x-amount');
+    const headerPlanId = req.headers.get('x-plan-id');
+
+    let rawPlanName: string | null = queryPlan || headerPlan || null;
+    let rawAmount: string | number | null = queryAmount || headerAmount || null;
+
+    if (!rawPlanName && (queryPlanId === '6m' || headerPlanId === '6m')) {
+      rawPlanName = '6 Months Access (1,000 Birr)';
+      rawAmount = 1000;
+    } else if (!rawPlanName && (queryPlanId === '3m' || headerPlanId === '3m')) {
+      rawPlanName = '3 Months Access (600 Birr)';
+      rawAmount = 600;
+    } else if (!rawPlanName && (queryPlanId === '1m' || headerPlanId === '1m')) {
+      rawPlanName = '1 Month Access (200 Birr)';
+      rawAmount = 200;
+    }
 
     const contentType = req.headers.get('content-type') || '';
 
@@ -22,10 +45,9 @@ export async function POST(req: NextRequest) {
       name = body.name || body.userName || body.payerName;
       phoneNumber = body.phone_number || body.phoneNumber || body.userPhone;
       paymentImage = body.payment_image || body.paymentImage || body.screenshotUrl || body.image;
-      if (body.plan_name || body.planName) planName = body.plan_name || body.planName;
-      if (body.amount !== undefined) {
-        const num = parseFloat(body.amount);
-        if (!isNaN(num)) amount = num;
+      if (body.plan_name || body.planName) rawPlanName = body.plan_name || body.planName;
+      if (body.amount !== undefined && body.amount !== null && body.amount !== '') {
+        rawAmount = body.amount;
       }
     } else {
       const formData = await req.formData();
@@ -33,13 +55,17 @@ export async function POST(req: NextRequest) {
       phoneNumber = (formData.get('phone_number') || formData.get('phoneNumber') || formData.get('userPhone')) as string | null;
       paymentImage = formData.get('payment_image') || formData.get('paymentImage') || formData.get('screenshotUrl');
       const pName = formData.get('plan_name') || formData.get('planName');
-      if (pName && typeof pName === 'string') planName = pName;
+      if (pName && typeof pName === 'string' && pName.trim()) {
+        rawPlanName = pName.trim();
+      }
       const amountStr = formData.get('amount') as string | null;
-      if (amountStr) {
-        const num = parseFloat(amountStr);
-        if (!isNaN(num)) amount = num;
+      if (amountStr && amountStr.trim()) {
+        rawAmount = amountStr.trim();
       }
     }
+
+    // Intelligently normalize the plan and amount (prevents dropping 600 / 1000 to 200)
+    const { planName, amount } = normalizePlanAndAmount(rawPlanName, rawAmount);
 
     // 1. Validate Name
     const nameValidation = validateFullName(name || '');

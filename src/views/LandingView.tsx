@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { NavigationTab, PaymentSubmission } from '../types';
 import { Button } from '../components/ui/Button';
@@ -43,9 +43,50 @@ export const LandingView: React.FC<LandingViewProps> = ({
   const [localVerifyModalOpen, setLocalVerifyModalOpen] = useState(false);
   const [verifySubmission, setVerifySubmission] = useState<PaymentSubmission | null>(null);
 
+  // Check URL query params for direct Instagram campaigns (e.g. ?plan=3m, ?plan=6m, ?subscribe=1)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const planParam = params.get('plan') || params.get('plan_name') || params.get('tier');
+        const subscribeParam = params.get('subscribe') || params.get('register');
+
+        if (planParam) {
+          const lower = planParam.toLowerCase();
+          if (lower.includes('1m') || lower.includes('200')) {
+            sessionStorage.setItem('nazazi_selected_plan_id', '1m');
+            localStorage.setItem('nazazi_selected_plan_id', '1m');
+            setSelectedPlanForSubscribe('1 Month Access (200 Birr)');
+          } else if (lower.includes('3m') || lower.includes('600')) {
+            sessionStorage.setItem('nazazi_selected_plan_id', '3m');
+            localStorage.setItem('nazazi_selected_plan_id', '3m');
+            setSelectedPlanForSubscribe('3 Months Access (600 Birr)');
+          } else if (lower.includes('6m') || lower.includes('1000') || lower.includes('1,000')) {
+            sessionStorage.setItem('nazazi_selected_plan_id', '6m');
+            localStorage.setItem('nazazi_selected_plan_id', '6m');
+            setSelectedPlanForSubscribe('6 Months Access (1,000 Birr)');
+          }
+        }
+
+        if (subscribeParam === 'true' || subscribeParam === '1') {
+          setIsSubscribeModalOpen(true);
+        }
+      } catch {}
+    }
+  }, []);
+
   const handleOpenSubscribe = (planName?: string, price?: string | number) => {
     if (planName && price) {
-      setSelectedPlanForSubscribe(`${planName} (${price} Birr)`);
+      const planStr = `${planName} (${price} Birr)`;
+      setSelectedPlanForSubscribe(planStr);
+      const lower = String(price).toLowerCase();
+      if (typeof window !== 'undefined') {
+        const planId = lower.includes('600') ? '3m' : lower.includes('1000') || lower.includes('1,000') ? '6m' : '1m';
+        try {
+          sessionStorage.setItem('nazazi_selected_plan_id', planId);
+          localStorage.setItem('nazazi_selected_plan_id', planId);
+        } catch {}
+      }
     } else {
       setSelectedPlanForSubscribe('');
     }

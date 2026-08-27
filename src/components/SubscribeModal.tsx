@@ -41,11 +41,19 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
   const isAmharic = language === 'am';
 
   const getPlanIdFromStr = (str?: string): '1m' | '3m' | '6m' => {
-    if (!str) return '6m';
+    if (!str) {
+      if (typeof window !== 'undefined') {
+        const stored = sessionStorage.getItem('nazazi_selected_plan_id') || localStorage.getItem('nazazi_selected_plan_id');
+        if (stored === '1m' || stored === '3m' || stored === '6m') {
+          return stored;
+        }
+      }
+      return '6m';
+    }
     const lower = str.toLowerCase();
-    if (lower.includes('1 month') || lower.includes('የ1 ወር') || lower.includes('200')) return '1m';
-    if (lower.includes('3 month') || lower.includes('የ3 ወር') || lower.includes('600')) return '3m';
-    if (lower.includes('6 month') || lower.includes('የ6 ወር') || lower.includes('1000') || lower.includes('1,000')) return '6m';
+    if (lower.includes('1 month') || lower.includes('የ1 ወር') || lower === '1m' || lower.includes('200')) return '1m';
+    if (lower.includes('3 month') || lower.includes('የ3 ወር') || lower === '3m' || lower.includes('600')) return '3m';
+    if (lower.includes('6 month') || lower.includes('የ6 ወር') || lower === '6m' || lower.includes('1000') || lower.includes('1,000')) return '6m';
     return '6m';
   };
 
@@ -53,6 +61,16 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
   const [direction, setDirection] = useState<1 | -1>(1);
 
   const [selectedPlanId, setSelectedPlanId] = useState<'1m' | '3m' | '6m'>(() => getPlanIdFromStr(initialPlan));
+
+  const handleSelectPlan = (planId: '1m' | '3m' | '6m') => {
+    setSelectedPlanId(planId);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.setItem('nazazi_selected_plan_id', planId);
+        localStorage.setItem('nazazi_selected_plan_id', planId);
+      } catch {}
+    }
+  };
   const [name, setName] = useState('');
   const [nameTouched, setNameTouched] = useState(false);
   const [phone, setPhone] = useState('');
@@ -213,9 +231,19 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
         formData.append('payment_image', String(imageToUpload));
       }
 
-      // 3. Call backend route
-      const response = await fetch('/api/register', {
+      // 3. Call backend route with multi-channel plan hints (crucial for Instagram WebViews)
+      const registerUrl = new URL('/api/register', typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+      registerUrl.searchParams.set('plan_name', selectedPlan);
+      registerUrl.searchParams.set('amount', String(planAmount));
+      registerUrl.searchParams.set('plan_id', selectedPlanId);
+
+      const response = await fetch(registerUrl.toString(), {
         method: 'POST',
+        headers: {
+          'X-Plan-Name': encodeURIComponent(selectedPlan),
+          'X-Plan-Amount': String(planAmount),
+          'X-Plan-Id': selectedPlanId,
+        },
         body: formData,
       });
 
@@ -376,7 +404,7 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
                     <button
                       key={p.id}
                       type="button"
-                      onClick={() => setSelectedPlanId(p.id as '1m' | '3m' | '6m')}
+                      onClick={() => handleSelectPlan(p.id as '1m' | '3m' | '6m')}
                       className={`relative p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
                         isSelected
                           ? 'border-zinc-900 dark:border-white bg-zinc-900 text-white dark:bg-white dark:text-zinc-950 shadow-xs'

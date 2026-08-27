@@ -6,6 +6,7 @@ import {
   deleteRegistration,
   resetAllRegistrations,
   isSupabaseConfigured,
+  getDeletedTombstonesList,
 } from '@/lib/supabaseServer';
 import { isCloudinaryConfigured } from '@/lib/cloudinaryServer';
 import { authorizeAdminRequest } from '@/lib/adminAuth';
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       registrations,
+      tombstones: getDeletedTombstonesList(),
       stats: {
         total: registrations.length,
         pending: pendingCount,
