@@ -55,18 +55,16 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md border-b border-zinc-200/80 dark:border-zinc-800/80 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Brand Logo & Title */}
+        {/* Brand Logo */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => onNavigate('landing')}
             className="flex items-center gap-2.5 group text-left cursor-pointer focus:outline-none"
+            aria-label="Home"
           >
             <div className="w-9 h-9 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-200 font-black text-lg shrink-0">
               <span>N</span>
             </div>
-            <span className={`font-black tracking-tight text-xl text-zinc-900 dark:text-zinc-50 leading-none flex items-center ${isAmharic ? 'font-nazazi' : ''}`}>
-              {t('header.title')}
-            </span>
           </button>
         </div>
 
@@ -135,8 +133,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                     className="w-full flex items-center justify-between p-2.5 rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition-colors cursor-pointer text-left group"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 flex items-center justify-center font-bold text-xs shadow-xs">
-                        <Smartphone className="w-4 h-4" />
+                      <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 flex items-center justify-center font-bold text-xs border border-zinc-200 dark:border-zinc-700">
+                        <Smartphone className="w-4 h-4 text-zinc-700 dark:text-zinc-300" />
                       </div>
                       <div>
                         <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100">

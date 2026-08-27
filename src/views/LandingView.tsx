@@ -15,7 +15,6 @@ import {
   ChevronDown,
   Quote,
   Smartphone,
-  Sparkles,
 } from 'lucide-react';
 
 interface LandingViewProps {
@@ -392,7 +391,6 @@ export const LandingView: React.FC<LandingViewProps> = ({
 
           {/* Sleek Floating Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-zinc-200/90 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md shadow-xs">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400 animate-pulse" />
             <span className="text-xs font-bold tracking-wide uppercase text-zinc-800 dark:text-zinc-200">
               {t('landing.pricingHeaderTitle')}
             </span>
@@ -430,7 +428,6 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 {plan.popular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <span className="px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 shadow-md flex items-center gap-1 border border-zinc-700 dark:border-zinc-300">
-                      <Sparkles className="w-3 h-3 text-amber-400 dark:text-amber-500" />
                       {isAmharic ? 'እጅግ ተመራጭ' : 'Best Value'}
                     </span>
                   </div>

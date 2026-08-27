@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavigationTab } from '../types';
 import { useLanguage } from '../context/LanguageContext';
-import { ArrowUpRight, ShieldCheck } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
 
 interface FooterProps {
   onNavigate: (tab: NavigationTab) => void;
@@ -58,8 +58,7 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate, onOpenVerifyModal })
                 </button>
               </li>
               <li>
-                <button onClick={() => onNavigate('admin')} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+                <button onClick={() => onNavigate('admin')} className="hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors cursor-pointer font-bold text-zinc-900 dark:text-zinc-100">
                   {isAmharic ? 'የአድሚን SMS ኮንሶል' : 'Admin SMS Console'}
                 </button>
               </li>
