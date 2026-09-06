@@ -174,7 +174,7 @@ export async function uploadPaymentImageToCloudinary(
 
       return {
         public_id: `${folder}/${publicId}`,
-        secure_url: base64DataUri,
+        secure_url: '',
         uploadedToCloudinary: false,
         error: `Cloudinary upload failed: ${errMsg}`,
         cloudName,
@@ -182,10 +182,10 @@ export async function uploadPaymentImageToCloudinary(
     }
   }
 
-  // Graceful fallback for local development or unconfigured environment
+  // Graceful fallback when Cloudinary is not configured (do not store raw base64 as remote URL)
   return {
     public_id: `${folder}/${publicId}`,
-    secure_url: base64DataUri,
+    secure_url: '',
     uploadedToCloudinary: false,
     error: isConfigured ? 'Cloudinary initialization failed' : 'Cloudinary credentials not configured',
     cloudName: cloudName || undefined,

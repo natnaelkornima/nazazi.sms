@@ -106,9 +106,11 @@ export async function POST(req: NextRequest) {
 
     const cleanPhone = phoneValidation.cleanPhone;
 
-    // 3. Process & Validate Payment Image
-    let buffer: Buffer;
-    let mimeType = 'image/jpeg';
+    // 3. Process & Validate Payment Image (Upload to Cloudinary only, ZERO base64 in Supabase)
+    let finalCloudinaryUrl = '';
+    let uploadedToCloudinary = false;
+    let uploadError: string | null = null;
+    let cloudNameResult: string | null = null;
 
     if (!paymentImage) {
       return NextResponse.json(
@@ -120,65 +122,81 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (typeof paymentImage === 'string') {
-      if (paymentImage.startsWith('data:')) {
-        const matches = paymentImage.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-        if (matches && matches.length === 3) {
-          mimeType = matches[1];
-          buffer = Buffer.from(matches[2], 'base64');
+    // Check if the image is already a remote hosted URL
+    if (
+      typeof paymentImage === 'string' &&
+      (paymentImage.startsWith('https://') || paymentImage.startsWith('http://'))
+    ) {
+      finalCloudinaryUrl = paymentImage.trim();
+      uploadedToCloudinary = true;
+    } else {
+      let buffer: Buffer | null = null;
+      let mimeType = 'image/jpeg';
+
+      if (typeof paymentImage === 'string') {
+        if (paymentImage.startsWith('data:')) {
+          const matches = paymentImage.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+          if (matches && matches.length === 3) {
+            mimeType = matches[1];
+            buffer = Buffer.from(matches[2], 'base64');
+          } else {
+            const parts = paymentImage.split(',');
+            buffer = Buffer.from(parts[1] || parts[0], 'base64');
+          }
         } else {
-          const parts = paymentImage.split(',');
-          buffer = Buffer.from(parts[1] || parts[0], 'base64');
+          try {
+            buffer = Buffer.from(paymentImage, 'base64');
+          } catch {
+            buffer = null;
+          }
         }
-      } else {
-        buffer = Buffer.from(paymentImage, 'base64');
+      } else if (paymentImage instanceof Blob) {
+        if (paymentImage.size > MAX_FILE_SIZE) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Payment image exceeds the maximum limit of 10 MB.',
+            },
+            { status: 400 }
+          );
+        }
+        mimeType = paymentImage.type || 'image/jpeg';
+        const arrayBuffer = await paymentImage.arrayBuffer();
+        buffer = Buffer.from(arrayBuffer);
       }
-    } else if (paymentImage instanceof Blob) {
-      if (paymentImage.size > MAX_FILE_SIZE) {
+
+      if (!buffer || buffer.length === 0) {
         return NextResponse.json(
           {
             success: false,
-            error: 'Payment image exceeds the maximum limit of 10 MB.',
+            error: 'Payment image is empty. Please select a valid screenshot.',
           },
           { status: 400 }
         );
       }
-      mimeType = paymentImage.type || 'image/jpeg';
-      const arrayBuffer = await paymentImage.arrayBuffer();
-      buffer = Buffer.from(arrayBuffer);
-    } else {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid image file format provided.',
-        },
-        { status: 400 }
-      );
+
+      // 4. Upload Payment Image to Cloudinary (Server-Side)
+      const uploadRes = await uploadPaymentImageToCloudinary(buffer, mimeType);
+      uploadedToCloudinary = uploadRes.uploadedToCloudinary;
+      uploadError = uploadRes.error || null;
+      cloudNameResult = uploadRes.cloudName || null;
+
+      if (
+        uploadedToCloudinary &&
+        uploadRes.secure_url &&
+        (uploadRes.secure_url.startsWith('https://') || uploadRes.secure_url.startsWith('http://'))
+      ) {
+        finalCloudinaryUrl = uploadRes.secure_url.trim();
+      } else {
+        finalCloudinaryUrl = '';
+      }
     }
 
-    if (!buffer || buffer.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Payment image is empty. Please select a valid screenshot.',
-        },
-        { status: 400 }
-      );
-    }
-
-    // 4. Upload Payment Image to Cloudinary (Server-Side)
-    const {
-      secure_url: cloudinaryImageUrl,
-      uploadedToCloudinary,
-      error: uploadError,
-      cloudName,
-    } = await uploadPaymentImageToCloudinary(buffer, mimeType);
-
-    // 5. Store in Supabase
+    // 5. Store in Supabase (Strictly lightweight link or empty, NEVER image binary/base64)
     const { record, savedToSupabase, error: dbError } = await saveRegistrationToSupabase({
       name: name.trim(),
       phone_number: cleanPhone,
-      payment_image_url: cloudinaryImageUrl,
+      payment_image_url: finalCloudinaryUrl,
       plan_name: planName,
       amount: isNaN(amount) ? 200 : amount,
       status: 'pending',
@@ -193,7 +211,7 @@ export async function POST(req: NextRequest) {
         savedToSupabase,
         uploadedToCloudinary,
         cloudinaryError: uploadError || null,
-        cloudName: cloudName || null,
+        cloudName: cloudNameResult || null,
         dbError: dbError || null,
         registration: record,
       },

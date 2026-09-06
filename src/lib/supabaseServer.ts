@@ -159,18 +159,38 @@ function saveStateToDisk() {
   }
 }
 
+function safeJsonParse<T>(raw: string | null | undefined): T | null {
+  if (!raw || typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) return null;
+  try {
+    return JSON.parse(trimmed) as T;
+  } catch {
+    return null;
+  }
+}
+
 function loadStateFromDisk() {
   const candidateFiles = [PRIMARY_STATE_FILE, TMP_STATE_FILE];
   for (const filePath of candidateFiles) {
     try {
       if (fs.existsSync(filePath)) {
         const raw = fs.readFileSync(filePath, 'utf-8');
-        if (raw) {
-          const parsed = JSON.parse(raw);
+        const parsed = safeJsonParse<{
+          statusOverrides?: [string, { status: 'pending' | 'approved' | 'rejected'; reviewed_at?: string }][];
+          planMeta?: [string, { planName: string; amount: number }][];
+          deletedTombstones?: string[];
+          inMemoryRegistrations?: RegistrationRecord[];
+        }>(raw);
+
+        if (parsed) {
           if (Array.isArray(parsed.statusOverrides)) {
             for (const [k, v] of parsed.statusOverrides) {
               if (k && v && typeof v === 'object' && v.status) {
-                statusOverridesMap.set(k, v);
+                statusOverridesMap.set(k, {
+                  status: v.status,
+                  reviewed_at: v.reviewed_at || new Date().toISOString(),
+                });
               }
             }
           }
@@ -205,13 +225,11 @@ function loadStateFromDisk() {
     try {
       if (fs.existsSync(pFile)) {
         const raw = fs.readFileSync(pFile, 'utf-8');
-        if (raw) {
-          const entries = JSON.parse(raw);
-          if (Array.isArray(entries)) {
-            for (const [k, v] of entries) {
-              if (k && v && typeof v === 'object' && v.planName) {
-                planMetaCache.set(k, v);
-              }
+        const entries = safeJsonParse<[string, { planName: string; amount: number }][]>(raw);
+        if (Array.isArray(entries)) {
+          for (const [k, v] of entries) {
+            if (k && v && typeof v === 'object' && v.planName) {
+              planMetaCache.set(k, v);
             }
           }
         }
@@ -226,13 +244,11 @@ function loadStateFromDisk() {
     try {
       if (fs.existsSync(tFile)) {
         const raw = fs.readFileSync(tFile, 'utf-8');
-        if (raw) {
-          const entries = JSON.parse(raw);
-          if (Array.isArray(entries)) {
-            for (const t of entries) {
-              if (t && typeof t === 'string') {
-                deletedTombstonesMap.add(t);
-              }
+        const entries = safeJsonParse<string[]>(raw);
+        if (Array.isArray(entries)) {
+          for (const t of entries) {
+            if (t && typeof t === 'string') {
+              deletedTombstonesMap.add(t);
             }
           }
         }
@@ -577,6 +593,24 @@ async function discoverTableInfo(client: SupabaseClient): Promise<{ tableName: s
 /**
  * Saves a new registration record into Supabase with adaptive column discovery and fallback.
  */
+/**
+ * Ensures that only genuine HTTP/HTTPS remote web links (e.g. from Cloudinary) are sent to Supabase.
+ * Strictly blocks raw base64 data URIs, image blobs, or oversized strings to guarantee zero
+ * image bytes are stored in Supabase.
+ */
+function sanitizeImageUrlForSupabase(url?: string | null): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (
+    (trimmed.startsWith('https://') || trimmed.startsWith('http://')) &&
+    !trimmed.includes(';base64,') &&
+    trimmed.length < 2000
+  ) {
+    return trimmed;
+  }
+  return null;
+}
+
 export async function saveRegistrationToSupabase(data: {
   name: string;
   phone_number: string;
@@ -593,11 +627,14 @@ export async function saveRegistrationToSupabase(data: {
     data.amount
   );
 
+  // Strictly enforce link only for Supabase: never store base64 in Supabase
+  const safeSupabaseImageUrl = sanitizeImageUrlForSupabase(data.payment_image_url);
+
   const record: RegistrationRecord = {
     id: fallbackId,
     name: data.name.trim(),
     phone_number: data.phone_number.trim(),
-    payment_image_url: data.payment_image_url,
+    payment_image_url: safeSupabaseImageUrl || (data.payment_image_url && data.payment_image_url.startsWith('http') ? data.payment_image_url : ''),
     plan_name: normalizedPlanName,
     amount: normalizedAmount,
     status: data.status || 'pending',
@@ -659,21 +696,21 @@ export async function saveRegistrationToSupabase(data: {
       smartPayload.phone_number = record.phone_number;
     }
 
-    // Payment image column mapping
+    // Payment image column mapping (STRICTLY safe external link or null - ZERO image bytes in Supabase)
     if (knownCols.has('payment_image_url')) {
-      smartPayload.payment_image_url = record.payment_image_url;
+      smartPayload.payment_image_url = safeSupabaseImageUrl;
     } else if (knownCols.has('image_url')) {
-      smartPayload.image_url = record.payment_image_url;
+      smartPayload.image_url = safeSupabaseImageUrl;
     } else if (knownCols.has('screenshot_url')) {
-      smartPayload.screenshot_url = record.payment_image_url;
+      smartPayload.screenshot_url = safeSupabaseImageUrl;
     } else if (knownCols.has('receipt_url')) {
-      smartPayload.receipt_url = record.payment_image_url;
+      smartPayload.receipt_url = safeSupabaseImageUrl;
     } else if (knownCols.has('payment_image')) {
-      smartPayload.payment_image = record.payment_image_url;
+      smartPayload.payment_image = safeSupabaseImageUrl;
     } else if (knownCols.has('file_url')) {
-      smartPayload.file_url = record.payment_image_url;
+      smartPayload.file_url = safeSupabaseImageUrl;
     } else {
-      smartPayload.payment_image_url = record.payment_image_url;
+      smartPayload.payment_image_url = safeSupabaseImageUrl;
     }
 
     // Plan column mapping (only include if table supports it or schema unknown)
@@ -750,14 +787,14 @@ export async function saveRegistrationToSupabase(data: {
     console.warn('Smart payload insertion attempt error:', err);
   }
 
-  // 2. Comprehensive Multi-Candidate Fallback Matrix
+  // 2. Comprehensive Multi-Candidate Fallback Matrix (Link-only for Supabase)
   const candidateTables = ['registrations', 'payments', 'subscriptions', 'subscribers', 'users', 'members'];
   const candidatePayloads = [
     // Variant 1: standard names
     {
       name: record.name,
       phone_number: record.phone_number,
-      payment_image_url: record.payment_image_url,
+      payment_image_url: safeSupabaseImageUrl,
       plan_name: record.plan_name,
       amount: record.amount,
       status: record.status,
@@ -766,14 +803,14 @@ export async function saveRegistrationToSupabase(data: {
     {
       name: record.name,
       phone_number: record.phone_number,
-      payment_image_url: record.payment_image_url,
+      payment_image_url: safeSupabaseImageUrl,
       status: record.status,
     },
     // Variant 3: full_name / phone / image_url / plan / amount
     {
       full_name: record.name,
       phone: record.phone_number,
-      image_url: record.payment_image_url,
+      image_url: safeSupabaseImageUrl,
       plan: record.plan_name,
       price: record.amount,
       status: record.status,
@@ -782,34 +819,34 @@ export async function saveRegistrationToSupabase(data: {
     {
       full_name: record.name,
       phone: record.phone_number,
-      image_url: record.payment_image_url,
+      image_url: safeSupabaseImageUrl,
       status: record.status,
     },
     // Variant 5: full_name / phone / screenshot_url
     {
       full_name: record.name,
       phone: record.phone_number,
-      screenshot_url: record.payment_image_url,
+      screenshot_url: safeSupabaseImageUrl,
       status: record.status,
     },
     // Variant 6: name / phone / receipt_url
     {
       name: record.name,
       phone: record.phone_number,
-      receipt_url: record.payment_image_url,
+      receipt_url: safeSupabaseImageUrl,
       status: record.status,
     },
     // Variant 7: minimal core
     {
       name: record.name,
       phone_number: record.phone_number,
-      payment_image_url: record.payment_image_url,
+      payment_image_url: safeSupabaseImageUrl,
     },
     // Variant 8: minimal full_name
     {
       full_name: record.name,
       phone: record.phone_number,
-      image_url: record.payment_image_url,
+      image_url: safeSupabaseImageUrl,
     },
   ];
 
@@ -1560,3 +1597,63 @@ export async function batchSyncRegistrations(
     updatedCount,
   };
 }
+
+/**
+ * Scans Supabase for any records containing heavy base64 strings or non-HTTP images
+ * and clears them to NULL so the database frees up storage immediately, keeping all user contact info.
+ */
+export async function cleanBase64ImagesFromSupabase(): Promise<{
+  success: boolean;
+  cleanedCount: number;
+  message: string;
+}> {
+  const client = getSupabaseClient();
+  let cleanedCount = 0;
+
+  // Clean in-memory cache
+  inMemoryRegistrations = inMemoryRegistrations.map((reg) => {
+    if (reg.payment_image_url && !reg.payment_image_url.startsWith('http')) {
+      return { ...reg, payment_image_url: '' };
+    }
+    return reg;
+  });
+
+  if (!client) {
+    return {
+      success: true,
+      cleanedCount: 0,
+      message: 'Cleaned local memory. Supabase is not connected.',
+    };
+  }
+
+  const candidateTables = ['registrations', 'payments', 'subscriptions'];
+  for (const tableName of candidateTables) {
+    try {
+      // Find rows where payment_image_url starts with data:
+      const { data, error } = await client
+        .from(tableName)
+        .select('id, payment_image_url')
+        .like('payment_image_url', 'data:%')
+        .limit(1000);
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        for (const row of data) {
+          const rowId = (row as Record<string, unknown>).id;
+          if (rowId) {
+            await client.from(tableName).update({ payment_image_url: null }).eq('id', rowId);
+            cleanedCount++;
+          }
+        }
+      }
+    } catch (tableErr) {
+      console.warn(`Error cleaning table ${tableName}:`, tableErr);
+    }
+  }
+
+  return {
+    success: true,
+    cleanedCount,
+    message: `Cleaned ${cleanedCount} base64 image record(s) from Supabase.`,
+  };
+}
+
