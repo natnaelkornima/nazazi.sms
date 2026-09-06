@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { PaymentSubmission } from '../types';
 import { AdminLoginGate } from '../components/AdminLoginGate';
+import { useRegistrationDeadline } from '../hooks/useRegistrationDeadline';
 import {
   ShieldCheck,
   Search,
@@ -92,6 +93,7 @@ interface AdminDashboardViewProps {
 export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAdmin }) => {
   const { theme, toggleTheme } = useTheme();
   const { language, toggleLanguage } = useLanguage();
+  const { days, hours, isClosed: isRegistrationClosedDeadline } = useRegistrationDeadline();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const token =
@@ -670,6 +672,32 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Public Registration Countdown & Status Indicator */}
+          <div
+            className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl sm:rounded-2xl border text-xs font-bold ${
+              isRegistrationClosedDeadline
+                ? 'bg-amber-500/10 border-amber-500/30 text-amber-600 dark:text-amber-400'
+                : 'bg-zinc-100 dark:bg-zinc-850 border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300'
+            }`}
+            title={
+              isRegistrationClosedDeadline
+                ? 'Public registration has closed. Admin remains 100% active.'
+                : `Public registration is active with ~${days}d ${hours}h remaining.`
+            }
+          >
+            {isRegistrationClosedDeadline ? (
+              <>
+                <Lock className="w-3.5 h-3.5 text-amber-500" />
+                <span>Registration: Closed</span>
+              </>
+            ) : (
+              <>
+                <Clock className="w-3.5 h-3.5 text-amber-500" />
+                <span>Reg: {days}d {hours}h left</span>
+              </>
+            )}
+          </div>
+
           {/* Real-time Live Sync Indicator & Quick Refresh */}
           <button
             onClick={() => {

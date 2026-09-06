@@ -14,9 +14,11 @@ import {
   ShieldCheck,
   ImageIcon,
   RefreshCw,
+  Lock,
 } from 'lucide-react';
 import { compressImage } from '@/lib/imageCompressor';
 import { validateFullName, validateEthiopianPhone } from '@/lib/validation';
+import { useRegistrationDeadline } from '@/hooks/useRegistrationDeadline';
 
 const MAX_FILE_SIZE_MB = 5;
 const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
@@ -31,6 +33,7 @@ interface SubmittedRegistration {
 
 export default function RegisterPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { isClosed } = useRegistrationDeadline();
 
   // Form State (name, phone_number, plan, and payment image)
   const [name, setName] = useState('');
@@ -315,7 +318,43 @@ export default function RegisterPage() {
       <main className="flex-1 flex items-center justify-center px-4 py-10 sm:py-16">
         <div className="w-full max-w-lg">
           <AnimatePresence mode="wait">
-            {!isSuccess ? (
+            {isClosed ? (
+              /* ================= Registration Closed State ================= */
+              <motion.div
+                key="register-closed"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{ duration: 0.25 }}
+                className="bg-zinc-900 border border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/60 text-center space-y-6"
+              >
+                <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700/80 flex items-center justify-center mx-auto text-amber-400 shadow-md">
+                  <Lock className="w-8 h-8" />
+                </div>
+
+                <div className="space-y-2">
+                  <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                    Registration Closed / ምዝገባው ተጠናቋል
+                  </span>
+                  <h1 className="text-2xl font-black tracking-tight text-white">
+                    Cohort Registration is Closed
+                  </h1>
+                  <p className="text-xs sm:text-sm text-zinc-400 leading-relaxed max-w-sm mx-auto">
+                    The registration period has ended for this round. New applications are currently closed. If you have already registered, you can verify your approval status on the home page.
+                  </p>
+                </div>
+
+                <div className="pt-2">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center justify-center gap-2 w-full py-3 px-4 rounded-xl bg-white text-zinc-950 font-bold text-xs sm:text-sm hover:bg-zinc-100 transition-colors shadow-md"
+                  >
+                    <span>Return to Home & Verify Status</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </motion.div>
+            ) : !isSuccess ? (
               /* ================= Registration Form ================= */
               <motion.div
                 key="register-form"

@@ -3,6 +3,7 @@ import { uploadPaymentImageToCloudinary } from '@/lib/cloudinaryServer';
 import { saveRegistrationToSupabase } from '@/lib/supabaseServer';
 import { validateFullName, validateEthiopianPhone } from '@/lib/validation';
 import { normalizePlanAndAmount } from '@/lib/planUtils';
+import { isRegistrationClosed } from '@/lib/deadlineConfig';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,18 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB limit
 
 export async function POST(req: NextRequest) {
   try {
+    // Automatically block new registrations once the set deadline passes
+    if (isRegistrationClosed()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Registration is officially closed. No new registrations are being accepted at this time.',
+          isClosed: true,
+        },
+        { status: 403 }
+      );
+    }
+
     let name: string | null = null;
     let phoneNumber: string | null = null;
     let paymentImage: unknown = null;

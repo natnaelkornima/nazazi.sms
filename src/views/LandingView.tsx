@@ -8,6 +8,8 @@ import { Card } from '../components/ui/Card';
 import { Badge } from '../components/ui/Badge';
 import { SubscribeModal } from '../components/SubscribeModal';
 import { SubscriptionStatusModal } from '../components/SubscriptionStatusModal';
+import { RegistrationCountdown } from '../components/RegistrationCountdown';
+import { useRegistrationDeadline } from '../hooks/useRegistrationDeadline';
 import { useLanguage } from '../context/LanguageContext';
 import {
   ArrowRight,
@@ -15,6 +17,7 @@ import {
   ChevronDown,
   Quote,
   Smartphone,
+  Lock,
 } from 'lucide-react';
 
 interface LandingViewProps {
@@ -32,6 +35,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
 }) => {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const { language, t } = useLanguage();
+  const { isClosed } = useRegistrationDeadline();
   const isAmharic = language === 'am';
 
   // Modal states
@@ -324,6 +328,16 @@ export const LandingView: React.FC<LandingViewProps> = ({
             )}
           </motion.h2>
 
+          {/* Modern Sleek Registration Countdown Timer */}
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="w-full max-w-xl mx-auto"
+          >
+            <RegistrationCountdown onOpenVerifyModal={() => handleTriggerVerifyModal()} />
+          </motion.div>
+
           {/* Clean High-Contrast Action Buttons with Fixed Compact Padding & 5px Radius */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -331,18 +345,32 @@ export const LandingView: React.FC<LandingViewProps> = ({
             transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-row flex-wrap sm:flex-nowrap items-center justify-center gap-2.5 sm:gap-3 pt-2 sm:pt-4 w-auto mx-auto"
           >
-            {/* Subscribe Now Button */}
+            {/* Subscribe Now Button / Closed State */}
             <motion.button
               whileHover={{ scale: 1.02, y: -1 }}
               whileTap={{ scale: 0.98, y: 0 }}
-              onClick={scrollToPricing}
-              className="group relative w-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-[5px] font-bold text-xs sm:text-sm text-white bg-zinc-950 hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 shadow-[0_4px_14px_rgba(0,0,0,0.2)] dark:shadow-[0_4px_14px_rgba(255,255,255,0.12)] transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-2 border border-zinc-800/80 dark:border-zinc-200 ring-1 ring-white/15 dark:ring-black/10 overflow-hidden shrink-0"
+              onClick={isClosed ? () => setIsSubscribeModalOpen(true) : scrollToPricing}
+              className={`group relative w-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-[5px] font-bold text-xs sm:text-sm transition-all duration-200 cursor-pointer inline-flex items-center justify-center gap-2 border overflow-hidden shrink-0 ${
+                isClosed
+                  ? 'text-zinc-300 bg-zinc-800 hover:bg-zinc-750 border-zinc-700'
+                  : 'text-white bg-zinc-950 hover:bg-zinc-900 dark:bg-white dark:text-zinc-950 dark:hover:bg-zinc-100 shadow-[0_4px_14px_rgba(0,0,0,0.2)] dark:shadow-[0_4px_14px_rgba(255,255,255,0.12)] border-zinc-800/80 dark:border-zinc-200 ring-1 ring-white/15 dark:ring-black/10'
+              }`}
             >
-              {/* Animated Light Sweep Reflection */}
-              <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-black/10 to-transparent pointer-events-none" />
+              {!isClosed && (
+                <div className="absolute inset-0 -translate-x-full group-hover:animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-black/10 to-transparent pointer-events-none" />
+              )}
 
-              <span className="relative z-10 tracking-tight whitespace-nowrap">{isAmharic ? 'ይመዝገቡ' : 'Subscribe Now'}</span>
-              <ArrowRight className="relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-300 dark:text-zinc-700 transition-transform duration-200 group-hover:translate-x-1 shrink-0" />
+              {isClosed ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-zinc-400" />
+                  <span>{isAmharic ? 'ምዝገባው ተጠናቋል' : 'Registration Closed'}</span>
+                </span>
+              ) : (
+                <>
+                  <span className="relative z-10 tracking-tight whitespace-nowrap">{isAmharic ? 'ይመዝገቡ' : 'Subscribe Now'}</span>
+                  <ArrowRight className="relative z-10 w-3.5 h-3.5 sm:w-4 sm:h-4 text-zinc-300 dark:text-zinc-700 transition-transform duration-200 group-hover:translate-x-1 shrink-0" />
+                </>
+              )}
             </motion.button>
 
             {/* Verify Approval Status Button */}
@@ -408,6 +436,31 @@ export const LandingView: React.FC<LandingViewProps> = ({
             {t('landing.pricingSubText')}
           </p>
         </motion.div>
+
+        {/* Closed Notification Banner for Pricing Area */}
+        {isClosed && (
+          <div className="max-w-xl mx-auto mb-6 p-4 rounded-2xl bg-zinc-100/90 dark:bg-zinc-900/90 border border-zinc-300/80 dark:border-zinc-700/80 text-center space-y-2 shadow-xs">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-200/90 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 text-xs font-bold">
+              <Lock className="w-3.5 h-3.5 text-zinc-600 dark:text-zinc-400" />
+              <span>{isAmharic ? 'የምዝገባ ጊዜ ተጠናቋል' : 'Registration is Closed'}</span>
+            </div>
+            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              {isAmharic
+                ? 'ለዚህ ዙር የተዘጋጀው ምዝገባ በይፋ ተጠናቋል። የተመዘገቡ አባላት የአባልነት ማረጋገጫቸውን በስልክ ቁጥር ማየት ይችላሉ።'
+                : 'Registration for this cohort is officially closed. Registered members can verify their approval status below.'}
+            </p>
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => handleTriggerVerifyModal()}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-zinc-900 dark:text-zinc-100 bg-white dark:bg-zinc-800 border border-zinc-300 dark:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-zinc-750 transition-colors shadow-2xs cursor-pointer"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>{isAmharic ? 'የአባልነት ማረጋገጫ በስልክ' : 'Check Approval Status'}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 lg:gap-6 max-w-5xl mx-auto items-stretch">
           {pricingPlans.map((plan, i) => (
@@ -487,13 +540,20 @@ export const LandingView: React.FC<LandingViewProps> = ({
                 {/* Snug Action Button */}
                 <div className="pt-4 mt-2">
                   <Button
-                    variant={plan.ctaVariant}
+                    variant={isClosed ? 'secondary' : plan.ctaVariant}
                     className={`w-full font-bold text-xs py-2.5 rounded-xl cursor-pointer transition-all ${
-                      plan.popular ? 'shadow-md hover:shadow-lg' : ''
+                      plan.popular && !isClosed ? 'shadow-md hover:shadow-lg' : ''
                     }`}
                     onClick={() => handleOpenSubscribe(plan.name, plan.price)}
                   >
-                    {plan.cta}
+                    {isClosed ? (
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        <Lock className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                        <span>{isAmharic ? 'ምዝገባው ተጠናቋል' : 'Registration Closed'}</span>
+                      </span>
+                    ) : (
+                      plan.cta
+                    )}
                   </Button>
                 </div>
               </Card>
@@ -581,10 +641,21 @@ export const LandingView: React.FC<LandingViewProps> = ({
           <div className="flex flex-row flex-wrap sm:flex-nowrap items-center justify-center gap-2.5 sm:gap-3">
             <Button
               size="md"
-              onClick={scrollToPricing}
-              className="w-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-[5px] text-xs sm:text-sm bg-white text-zinc-950 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 font-extrabold shadow-md shrink-0"
+              onClick={isClosed ? () => setIsSubscribeModalOpen(true) : scrollToPricing}
+              className={`w-auto px-4 py-2 sm:px-5 sm:py-2.5 rounded-[5px] text-xs sm:text-sm font-extrabold shadow-md shrink-0 ${
+                isClosed
+                  ? 'bg-zinc-700 text-white hover:bg-zinc-600'
+                  : 'bg-white text-zinc-950 hover:bg-zinc-100 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800'
+              }`}
             >
-              {isAmharic ? 'አሁኑኑ ተመዝገቡ' : 'Subscribe Now'}
+              {isClosed ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 text-zinc-300" />
+                  <span>{isAmharic ? 'ምዝገባው ተጠናቋል' : 'Registration Closed'}</span>
+                </span>
+              ) : (
+                (isAmharic ? 'አሁኑኑ ተመዝገቡ' : 'Subscribe Now')
+              )}
             </Button>
             <Button
               size="md"
@@ -603,6 +674,7 @@ export const LandingView: React.FC<LandingViewProps> = ({
         isOpen={isSubscribeModalOpen}
         onClose={() => setIsSubscribeModalOpen(false)}
         initialPlan={selectedPlanForSubscribe}
+        onOpenVerifyModal={() => handleTriggerVerifyModal(null)}
         onSuccess={(sub) => {
           if (onOpenVerifyModal) {
             onOpenVerifyModal(sub);

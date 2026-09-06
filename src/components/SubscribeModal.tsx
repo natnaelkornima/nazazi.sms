@@ -20,13 +20,16 @@ import {
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
+  Lock,
 } from 'lucide-react';
+import { useRegistrationDeadline } from '../hooks/useRegistrationDeadline';
 
 interface SubscribeModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialPlan?: string;
   onSuccess: (submission: PaymentSubmission) => void;
+  onOpenVerifyModal?: () => void;
 }
 
 export const SubscribeModal: React.FC<SubscribeModalProps> = ({
@@ -34,10 +37,12 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
   onClose,
   initialPlan,
   onSuccess,
+  onOpenVerifyModal,
 }) => {
   const { submitPayment } = usePayment();
   const { error, info, success } = useToast();
   const { language } = useLanguage();
+  const { isClosed } = useRegistrationDeadline();
   const isAmharic = language === 'am';
 
   const getPlanIdFromStr = (str?: string): '1m' | '3m' | '6m' => {
@@ -319,6 +324,54 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="" description="" maxWidth="xl">
       <div className="text-zinc-900 dark:text-zinc-100 max-h-[85vh] overflow-y-auto px-1 sm:px-3 py-1">
+        {isClosed ? (
+          /* ================= REGISTRATION CLOSED STATE ================= */
+          <div className="py-6 sm:py-8 px-2 sm:px-4 text-center space-y-5">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-zinc-100 dark:bg-zinc-850 border border-zinc-200 dark:border-zinc-700/80 flex items-center justify-center mx-auto text-zinc-900 dark:text-white shadow-xs">
+              <Lock className="w-7 h-7 sm:w-8 sm:h-8 text-amber-500" />
+            </div>
+
+            <div className="space-y-2 max-w-md mx-auto">
+              <span className="inline-block px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
+                {isAmharic ? 'ምዝገባው ተጠናቋል' : 'Registration Closed'}
+              </span>
+              <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-zinc-900 dark:text-white">
+                {isAmharic ? 'የዚህ ዙር ምዝገባ በይፋ ተጠናቋል' : 'Registration is Officially Closed'}
+              </h3>
+              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                {isAmharic
+                  ? 'ለዚህ ዙር የተዘጋጀው ምዝገባ ቀነ-ገደብ አልፏል። አዲስ ምዝገባ በአሁኑ ወቅት አይቻልም። ቀድመው የተመዘገቡ አባላት የአባልነት ማረጋገጫቸውን በስልክ ቁጥር ማረጋገጥ ይችላሉ።'
+                  : 'The registration deadline for this cohort has concluded and no new sign-ups are being accepted. Previously registered members can verify their approval status anytime.'}
+              </p>
+            </div>
+
+            <div className="pt-3 flex flex-col sm:flex-row items-center justify-center gap-2.5 max-w-sm mx-auto">
+              {onOpenVerifyModal && (
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="w-full sm:w-auto font-bold text-xs py-2.5 px-4 cursor-pointer"
+                  onClick={() => {
+                    onClose();
+                    onOpenVerifyModal();
+                  }}
+                >
+                  <Smartphone className="w-3.5 h-3.5 mr-1.5" />
+                  <span>{isAmharic ? 'የአባልነት ማረጋገጫ በስልክ' : 'Verify Approval Status'}</span>
+                </Button>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full sm:w-auto font-semibold text-xs py-2.5 px-4 cursor-pointer"
+                onClick={onClose}
+              >
+                {isAmharic ? 'ዝጋ' : 'Close Window'}
+              </Button>
+            </div>
+          </div>
+        ) : (
+        <>
         {/* Minimalist Top Step Indicator */}
         <div className="flex items-center justify-between pb-3.5 mb-3 border-b border-zinc-100 dark:border-zinc-800 pr-9 sm:pr-10">
           <div className="flex items-center gap-2 sm:gap-3">
@@ -621,6 +674,8 @@ export const SubscribeModal: React.FC<SubscribeModalProps> = ({
             </motion.div>
           )}
         </AnimatePresence>
+        </>
+        )}
       </div>
     </Modal>
   );
