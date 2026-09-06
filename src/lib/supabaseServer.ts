@@ -248,6 +248,9 @@ loadStateFromDisk();
 
 export function isTombstoned(id?: string, phone?: string): boolean {
   if (id && deletedTombstonesMap.has(id)) return true;
+  // If record has an explicit ID that was not deleted, do not delete it just because of phone sharing
+  if (id) return false;
+
   const rawPhone = (phone || '').trim();
   if (!rawPhone) return false;
 
@@ -1027,37 +1030,68 @@ export async function getAllRegistrations(): Promise<{
 
   for (const tableName of candidateTables) {
     try {
-      let data: unknown[] | null = null;
-      let queryError: unknown = null;
+      const PAGE_SIZE = 1000;
+      let allRows: unknown[] = [];
+      let page = 0;
+      let hasMore = true;
+      let hasOrder = true;
+      let tableValid = false;
 
-      try {
-        const res = await client
-          .from(tableName)
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!res.error && res.data) {
-          data = res.data;
-        } else {
-          queryError = res.error;
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        let query = client.from(tableName).select('*');
+        if (hasOrder) {
+          query = query.order('created_at', { ascending: false });
         }
-      } catch (err) {
-        queryError = err;
-      }
+        query = query.range(from, to);
 
-      if (!data) {
-        try {
-          const resNoOrder = await client.from(tableName).select('*');
-          if (!resNoOrder.error && resNoOrder.data) {
-            data = resNoOrder.data;
+        const res = await query;
+
+        if (res.error) {
+          // If ordering by created_at failed on the very first page, retry without ordering
+          if (hasOrder && page === 0) {
+            hasOrder = false;
+            const noOrderRes = await client.from(tableName).select('*').range(from, to);
+            if (!noOrderRes.error && Array.isArray(noOrderRes.data) && noOrderRes.data.length > 0) {
+              tableValid = true;
+              allRows.push(...noOrderRes.data);
+              if (noOrderRes.data.length < PAGE_SIZE) {
+                hasMore = false;
+              } else {
+                page++;
+              }
+              continue;
+            }
           }
-        } catch {
-          // continue
+          break;
+        }
+
+        if (!Array.isArray(res.data) || res.data.length === 0) {
+          hasMore = false;
+          if (page > 0) {
+            tableValid = true;
+          }
+          break;
+        }
+
+        tableValid = true;
+        allRows.push(...res.data);
+
+        if (res.data.length < PAGE_SIZE) {
+          hasMore = false;
+        } else {
+          page++;
+          if (page > 100) break; // Safety limit: up to 100,000 records
         }
       }
 
-      if (!data || !Array.isArray(data)) {
+      if (!tableValid || allRows.length === 0) {
         continue;
       }
+
+      const data = allRows;
 
       const list: RegistrationRecord[] = [];
       for (const row of data) {
@@ -1337,7 +1371,8 @@ export async function deleteRegistration(
     planMetaCache.delete(id);
     deletedTombstonesMap.add(id);
   }
-  const rawPhone = (phoneNumber || '').trim();
+  // Only tombstone/delete by phone if no specific record ID was provided
+  const rawPhone = (!id && phoneNumber ? phoneNumber : '').trim();
   if (rawPhone) {
     statusOverridesMap.delete(rawPhone);
     planMetaCache.delete(rawPhone);
@@ -1386,7 +1421,7 @@ export async function deleteRegistration(
 
   inMemoryRegistrations = inMemoryRegistrations.filter((r) => {
     if (id && r.id === id) return false;
-    if (rawPhone && phoneMatches(r.phone_number, rawPhone)) return false;
+    if (!id && rawPhone && phoneMatches(r.phone_number, rawPhone)) return false;
     if (isTombstoned(r.id, r.phone_number)) return false;
     return true;
   });
@@ -1405,7 +1440,7 @@ export async function deleteRegistration(
           await client.from(tableName).delete().eq('id', Number(id));
         }
       }
-      if (phoneNumber) {
+      if (!id && phoneNumber) {
         const last8 = phoneNumber.replace(/\D/g, '').slice(-8);
         if (last8 && last8.length >= 7) {
           for (const col of ['phone_number', 'phone', 'user_phone']) {

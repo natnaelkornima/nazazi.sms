@@ -75,8 +75,9 @@ const addLocalTombstone = (id: string, phone?: string) => {
   if (typeof window === 'undefined') return;
   try {
     const tombstones = getLocalTombstones();
-    if (id) tombstones.add(id);
-    if (phone) {
+    if (id) {
+      tombstones.add(id);
+    } else if (phone) {
       const clean = phone.replace(/\D/g, '');
       tombstones.add(phone);
       if (clean) tombstones.add(clean);
@@ -111,6 +112,9 @@ const removeLocalTombstone = (phone?: string) => {
 const isLocallyTombstoned = (id?: string, phone?: string, tombstones?: Set<string>): boolean => {
   const ts = tombstones || getLocalTombstones();
   if (id && ts.has(id)) return true;
+  // If record has an explicit ID that is not tombstoned, preserve it
+  if (id) return false;
+
   if (phone) {
     if (ts.has(phone)) return true;
     const clean = phone.replace(/\D/g, '');
@@ -225,28 +229,25 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (data.success && Array.isArray(data.registrations)) {
           const mapped = data.registrations.map(mapRecordToSubmission);
 
-          // Deduplicate by ID and normalized Phone to prevent any duplicates
+          // Deduplicate by ID only so identical responses aren't duplicated,
+          // while preserving all distinct registration records from Supabase.
           const seenIds = new Set<string>();
-          const seenPhones = new Set<string>();
           const localTombstones = getLocalTombstones();
           const cleanList: PaymentSubmission[] = [];
 
           for (const item of mapped) {
             if (isLocallyTombstoned(item.id, item.userPhone, localTombstones)) continue;
-            const clean = item.userPhone.replace(/\D/g, '');
-            if (seenIds.has(item.id)) continue;
-            if (clean && seenPhones.has(clean)) continue;
-
-            seenIds.add(item.id);
-            if (clean) seenPhones.add(clean);
+            if (item.id) {
+              if (seenIds.has(item.id)) continue;
+              seenIds.add(item.id);
+            }
             cleanList.push(item);
           }
 
           setSubmissions((prev) => {
             const merged = cleanList.map((item) => {
-              const clean = item.userPhone.replace(/\D/g, '');
               const prevItem = prev.find(
-                (p) => p.id === item.id || (clean && p.userPhone.replace(/\D/g, '') === clean)
+                (p) => p.id === item.id || (!p.id && item.userPhone && p.userPhone === item.userPhone)
               );
 
               let effectivePlanName = item.planName;
@@ -298,13 +299,11 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
             }
 
             // Also preserve any recently added local submissions not yet present in server response
-            const existingIds = new Set(cleanList.map((c) => c.id));
-            const existingPhones = new Set(cleanList.map((c) => c.userPhone.replace(/\D/g, '')).filter(Boolean));
+            const existingIds = new Set(cleanList.map((c) => c.id).filter(Boolean));
 
             const additionalLocal = prev.filter((p) => {
               if (isLocallyTombstoned(p.id, p.userPhone, localTombstones)) return false;
-              const pPhone = p.userPhone.replace(/\D/g, '');
-              return !existingIds.has(p.id) && (!pPhone || !existingPhones.has(pPhone));
+              return p.id && !existingIds.has(p.id);
             });
 
             const finalList = [...additionalLocal, ...merged];
@@ -471,7 +470,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setSubmissions((prev) => {
       const updated = prev.map((sub) => {
-        if (sub.id === id || (targetPhone && phoneMatches(sub.userPhone, targetPhone))) {
+        if (sub.id === id || (!id && targetPhone && phoneMatches(sub.userPhone, targetPhone))) {
           return { ...sub, status: 'approved' as const, reviewedAt: new Date().toISOString() };
         }
         return sub;
@@ -502,7 +501,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setSubmissions((prev) => {
       const updated = prev.map((sub) => {
-        if (sub.id === id || (targetPhone && phoneMatches(sub.userPhone, targetPhone))) {
+        if (sub.id === id || (!id && targetPhone && phoneMatches(sub.userPhone, targetPhone))) {
           return { ...sub, status: 'rejected' as const, reviewedAt: new Date().toISOString() };
         }
         return sub;
@@ -532,7 +531,7 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setSubmissions((prev) => {
       const updated = prev.map((sub) => {
-        if (sub.id === id || (targetPhone && phoneMatches(sub.userPhone, targetPhone))) {
+        if (sub.id === id || (!id && targetPhone && phoneMatches(sub.userPhone, targetPhone))) {
           return { ...sub, planName, amount };
         }
         return sub;
@@ -561,12 +560,12 @@ export const PaymentProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const targetPhone = phone || existing?.userPhone || '';
 
     // Permanently record in local tombstone storage so it never resurfaces
-    addLocalTombstone(id, targetPhone);
+    addLocalTombstone(id, !id ? targetPhone : undefined);
 
     setSubmissions((prev) => {
       const updated = prev.filter((sub) => {
         if (sub.id === id) return false;
-        if (targetPhone && phoneMatches(sub.userPhone, targetPhone)) return false;
+        if (!id && targetPhone && phoneMatches(sub.userPhone, targetPhone)) return false;
         return true;
       });
       if (typeof window !== 'undefined') {
