@@ -110,3 +110,48 @@ export interface PaymentSubmission {
   notes?: string;
 }
 
+export type SmsProviderType = 'generic_http' | 'twilio' | 'africas_talking' | 'infobip' | 'simulation';
+
+export interface SmsGatewayConfig {
+  provider: SmsProviderType;
+  apiUrl: string;
+  apiKey: string;
+  senderId: string;
+  authHeader: string;
+  batchSize: number;
+  batchDelayMs: number;
+}
+
+export type SmsTargetPlan = 'all' | '200' | '600' | '1000' | 'single';
+export type SmsScheduleDuration = '1_week' | '3_weeks' | '1_month' | 'custom';
+
+export interface SmsScheduledCampaign {
+  id: string;
+  title: string;
+  targetPlan: SmsTargetPlan;
+  targetCount: number;
+  duration: SmsScheduleDuration;
+  dailyTime: string; // e.g. "07:00" for Morning text
+  startDate: string;
+  endDate: string;
+  messageTemplate: string;
+  status: 'active' | 'paused' | 'completed';
+  runsCompleted: number;
+  totalRuns: number;
+  createdAt: string;
+  lastRunAt?: string | null;
+  nextRunAt: string;
+}
+
+export interface SmsBatchDispatchProgress {
+  isDispatching: boolean;
+  totalRecipients: number;
+  totalBatches: number;
+  currentBatch: number;
+  sentCount: number;
+  failedCount: number;
+  statusText: string;
+  isPaused: boolean;
+  startTime?: number;
+}
+

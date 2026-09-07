@@ -13,6 +13,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useLanguage } from '../context/LanguageContext';
 import { PaymentSubmission } from '../types';
 import { AdminLoginGate } from '../components/AdminLoginGate';
+import { SmsConsole } from '../components/admin/SmsConsole';
 import { useRegistrationDeadline } from '../hooks/useRegistrationDeadline';
 import {
   ShieldCheck,
@@ -66,25 +67,6 @@ interface SmsLogItem {
   status: 'Delivered' | 'Queued' | 'Failed';
   segmentCount: number;
 }
-
-const FAITH_SMS_TEMPLATES = [
-  {
-    title: 'Daily Scripture & Peace',
-    text: 'Nazazi: "The LORD is my shepherd; I shall not want." - Psalm 23:1. May His grace fill your heart with peace and abundance today.',
-  },
-  {
-    title: 'Strength & Confidence',
-    text: 'Nazazi: "I can do all things through Christ who strengthens me." - Philippians 4:13. Walk boldly today knowing you are guided by His hand.',
-  },
-  {
-    title: 'Hope & Prosperity',
-    text: 'Nazazi: "For I know the plans I have for you, declares the LORD, plans to give you hope and a future." - Jeremiah 29:11.',
-  },
-  {
-    title: 'Comfort & Grace',
-    text: 'Nazazi: "Peace I leave with you; my peace I give you. Do not let your hearts be troubled." - John 14:27. Have a blessed day!',
-  },
-];
 
 interface AdminDashboardViewProps {
   onExitAdmin?: () => void;
@@ -160,12 +142,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
 
-  // SMS Dispatcher State
-  const [targetType, setTargetType] = useState<'all_approved' | 'single_member'>('all_approved');
-  const [selectedPhone, setSelectedPhone] = useState<string>('');
-  const [customPhone, setCustomPhone] = useState<string>('');
-  const [smsMessage, setSmsMessage] = useState<string>(FAITH_SMS_TEMPLATES[0].text);
-  const [isSendingSms, setIsSendingSms] = useState(false);
+  // SMS target phone selection state
+  const [selectedSmsPhone, setSelectedSmsPhone] = useState<string>('');
 
   // Settings Menu Popover State
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -250,63 +228,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   const startIndex = (validCurrentPage - 1) * pageSize;
   const endIndex = Math.min(startIndex + pageSize, filteredSubmissions.length);
   const paginatedSubmissions = filteredSubmissions.slice(startIndex, endIndex);
-
-  // Handle Send SMS to Approved Numbers
-  const handleSendSms = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!smsMessage.trim()) {
-      error('Empty Message', 'Please enter or select a scripture/encouragement message to send.');
-      return;
-    }
-
-    let recipientPhone = '';
-    let recipientName = '';
-
-    if (targetType === 'all_approved') {
-      if (approvedCount === 0) {
-        error(
-          'No Approved Members',
-          'Please approve at least one member in the Payment Approvals tab before sending bulk SMS.'
-        );
-        return;
-      }
-      recipientPhone = `All ${approvedCount} Approved Numbers`;
-      recipientName = `Bulk Dispatch (${approvedCount} Members)`;
-    } else {
-      const finalPhone = selectedPhone || customPhone;
-      if (!finalPhone.trim()) {
-        error('Phone Required', 'Please select or enter an approved member phone number.');
-        return;
-      }
-      recipientPhone = finalPhone;
-      const foundSub = submissions.find((s) => s.userPhone === finalPhone || s.userPhone.includes(finalPhone));
-      recipientName = foundSub ? foundSub.userName : 'Member';
-    }
-
-    setIsSendingSms(true);
-
-    setTimeout(() => {
-      setIsSendingSms(false);
-
-      const segments = Math.ceil(smsMessage.length / 160) || 1;
-      const newLog: SmsLogItem = {
-        id: `sms_${Date.now().toString(36)}`,
-        recipientPhone: recipientPhone,
-        recipientName: recipientName,
-        messageText: smsMessage,
-        sentAt: new Date().toISOString(),
-        status: 'Delivered',
-        segmentCount: segments,
-      };
-
-      setSmsLogs((prev) => [newLog, ...prev]);
-      success(
-        'SMS Dispatched Successfully!',
-        `Sent via SMS Gateway to ${recipientPhone}`
-      );
-    }, 600);
-  };
 
   const handleConfirmSingleDelete = async () => {
     if (!itemToDelete) return;
@@ -909,7 +830,6 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
         <div
           onClick={() => {
             setActiveTab('send_sms');
-            setTargetType('all_approved');
           }}
           className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
             activeTab === 'send_sms'
@@ -990,7 +910,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             }`}
           >
             <Send className="w-3.5 h-3.5 text-zinc-900 dark:text-zinc-100" />
-            <span>2. Send SMS</span>
+            <span>2. SMS Console</span>
             <span className="px-1.5 py-0.2 bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 text-[10px] font-bold rounded-md">
               {approvedCount}
             </span>
@@ -1335,9 +1255,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSelectedPhone(sub.userPhone);
+                                  setSelectedSmsPhone(sub.userPhone);
                                   setActiveTab('send_sms');
-                                  setTargetType('single_member');
                                 }}
                                 className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold text-zinc-900 dark:text-zinc-100 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
                               >
@@ -1625,9 +1544,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setSelectedPhone(sub.userPhone);
+                                    setSelectedSmsPhone(sub.userPhone);
                                     setActiveTab('send_sms');
-                                    setTargetType('single_member');
                                   }}
                                   className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-700 dark:text-zinc-200 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 transition-colors cursor-pointer border border-zinc-200 dark:border-zinc-700"
                                 >
@@ -1726,171 +1644,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
       )}
 
       {/* ========================================================================= */}
-      {/* PURPOSE 2: SEND SMS TO APPROVED MEMBERS */}
+      {/* PURPOSE 2: SEND SMS TO APPROVED MEMBERS (SEAMLESS CHUNKED & SCHEDULED) */}
       {/* ========================================================================= */}
       {activeTab === 'send_sms' && (
-        <Card className="p-6 sm:p-8 space-y-6 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="space-y-1 pb-3 border-b border-zinc-100 dark:border-zinc-800">
-            <div className="flex items-center gap-2">
-              <span className="p-2 rounded-xl bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950">
-                <Send className="w-5 h-5" />
-              </span>
-              <div>
-                <h2 className="text-lg font-extrabold text-zinc-900 dark:text-zinc-50">
-                  Send SMS to Approved Numbers
-                </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  Broadcast uplifting scripture verses or encouragement messages to active subscribers.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <form onSubmit={handleSendSms} className="space-y-6">
-            {/* Recipient Target Choice */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                1. Choose Recipients
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div
-                  onClick={() => setTargetType('all_approved')}
-                  className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                    targetType === 'all_approved'
-                      ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-800'
-                      : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                      <Users className="w-4 h-4" /> All Approved Subscribers
-                    </span>
-                    <Badge variant="zinc">{approvedCount} Active</Badge>
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Send bulk SMS to all members with verified payments simultaneously.
-                  </p>
-                </div>
-
-                <div
-                  onClick={() => setTargetType('single_member')}
-                  className={`p-4 rounded-xl border-2 transition-all cursor-pointer ${
-                    targetType === 'single_member'
-                      ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-50 dark:bg-zinc-800'
-                      : 'border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40'
-                  }`}
-                >
-                  <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100 block flex items-center gap-1.5">
-                    <Smartphone className="w-4 h-4" /> Single Approved Member
-                  </span>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Target an individual subscriber phone number.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Single Member Selector */}
-            {targetType === 'single_member' && (
-              <div className="space-y-2 p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700">
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                  Select Approved Phone Number
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <select
-                      value={selectedPhone}
-                      onChange={(e) => {
-                        setSelectedPhone(e.target.value);
-                        setCustomPhone('');
-                      }}
-                      className="w-full h-10 px-3 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-zinc-900"
-                    >
-                      <option value="">-- Select from Approved Subscribers --</option>
-                      {approvedSubmissions.map((s) => (
-                        <option key={s.id} value={s.userPhone}>
-                          {s.userName} ({s.userPhone})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <Input
-                      placeholder="Or enter recipient phone (+251...)"
-                      value={customPhone}
-                      onChange={(e) => {
-                        setCustomPhone(e.target.value);
-                        setSelectedPhone('');
-                      }}
-                      leftIcon={<Smartphone className="w-3.5 h-3.5 text-zinc-400" />}
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Quick Scripture Preset Templates */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 flex items-center justify-between">
-                <span>2. Quick Scripture & Faith Templates</span>
-                <span className="text-[10px] text-zinc-500 font-normal">
-                  Click a template to load message text
-                </span>
-              </label>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {FAITH_SMS_TEMPLATES.map((tmpl, idx) => (
-                  <div
-                    key={idx}
-                    onClick={() => setSmsMessage(tmpl.text)}
-                    className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-800/40 hover:border-zinc-900 dark:hover:border-zinc-100 hover:bg-zinc-100/80 dark:hover:bg-zinc-800 transition-all cursor-pointer space-y-1"
-                  >
-                    <p className="text-xs font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-zinc-500" /> {tmpl.title}
-                    </p>
-                    <p className="text-[11px] text-zinc-500 dark:text-zinc-400 line-clamp-2">
-                      {tmpl.text}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* SMS Body Textarea */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                  3. SMS Message Content
-                </label>
-                <span className="text-[11px] font-mono text-zinc-400">
-                  {smsMessage.length} characters • {Math.ceil(smsMessage.length / 160) || 1} SMS Segment(s)
-                </span>
-              </div>
-
-              <textarea
-                rows={4}
-                value={smsMessage}
-                onChange={(e) => setSmsMessage(e.target.value)}
-                placeholder="Type encouraging verse or announcement to dispatch..."
-                className="w-full p-3.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-zinc-900 focus:outline-hidden resize-none leading-relaxed font-sans"
-              />
-            </div>
-
-            {/* Submit Dispatch Button */}
-            <Button
-              type="submit"
-              size="lg"
-              isLoading={isSendingSms}
-              className="w-full font-extrabold bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-950 dark:hover:bg-zinc-200 rounded-xl py-3 text-sm shadow-sm"
-              leftIcon={<Send className="w-4 h-4" />}
-            >
-              {targetType === 'all_approved'
-                ? `Dispatch SMS to All ${approvedCount} Approved Members`
-                : `Send SMS to Recipient`}
-            </Button>
-          </form>
-        </Card>
+        <SmsConsole
+          submissions={submissions}
+          approvedCount={approvedCount}
+          smsLogs={smsLogs}
+          setSmsLogs={setSmsLogs}
+          initialSelectedPhone={selectedSmsPhone}
+        />
       )}
 
       {/* ========================================================================= */}

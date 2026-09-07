@@ -102,7 +102,7 @@ export const RegistrationCountdown: React.FC<RegistrationCountdownProps> = ({
 
         <div className="inline-flex items-center gap-1 text-[10px] sm:text-[11px] font-semibold text-zinc-500 dark:text-zinc-400">
           <Clock className="w-3 h-3 text-amber-500" />
-          <span>{isAmharic ? 'የ3 ቀናት ቀነ-ገደብ' : '3-Day Deadline'}</span>
+          <span>{isAmharic ? 'ዛሬ ማታ 6:00 ሰዓት ያበቃል' : 'Ends Tonight 6:00 (Ethiopian Time)'}</span>
         </div>
       </div>
 
@@ -135,7 +135,7 @@ export const RegistrationCountdown: React.FC<RegistrationCountdownProps> = ({
       {/* Footer Subtext */}
       <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
         <span className="truncate">
-          {isAmharic ? 'ቀነ ገደቡ ካለፈ በኋላ አዲስ ምዝገባ አይቻልም' : 'No new registrations accepted once the timer hits zero.'}
+          {isAmharic ? 'ቀነ ገደቡ ካለፈ በኋላ (ዛሬ ማታ 6:00) አዲስ ምዝገባ አይቻልም' : 'Registration closes tonight at 6:00 Ethiopian time.'}
         </span>
         <span className="shrink-0 font-medium text-amber-600 dark:text-amber-400">
           {isAmharic ? 'የተወሰነ ቦታ' : 'Limited spots'}
