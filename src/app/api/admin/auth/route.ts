@@ -67,6 +67,10 @@ function safeCompare(input: string, target: string): boolean {
   return crypto.timingSafeEqual(inputBuffer, targetBuffer);
 }
 
+export async function GET() {
+  return NextResponse.json({ success: true, service: 'Nazazi Admin Auth Service' });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'admin-client';
