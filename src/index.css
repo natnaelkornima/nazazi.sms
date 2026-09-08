@@ -30,7 +30,6 @@
 @font-face {
   font-family: "Habesha Serif";
   src: url("/fonts/habesha_serif.woff2") format("woff2"),
-       url("/fonts/habesha_serif_distort_italic_747d1eabb7.woff2") format("woff2"),
        url("/fonts/habesha_serif.ttf") format("truetype");
   font-weight: 100 900;
   font-style: normal;

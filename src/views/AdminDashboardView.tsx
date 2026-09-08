@@ -15,6 +15,7 @@ import { PaymentSubmission } from '../types';
 import { AdminLoginGate } from '../components/AdminLoginGate';
 import { SmsConsole } from '../components/admin/SmsConsole';
 import { useRegistrationDeadline } from '../hooks/useRegistrationDeadline';
+import { canonicalPhone } from '../lib/validation';
 import {
   ShieldCheck,
   Search,
@@ -141,6 +142,16 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
   // Export Loading States
   const [isExportingCsv, setIsExportingCsv] = useState(false);
   const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportingApprovedPdf, setIsExportingApprovedPdf] = useState(false);
+
+  // PDF Export Menu Dropdown State
+  const [isPdfMenuOpen, setIsPdfMenuOpen] = useState(false);
+  const pdfMenuRef = useRef<HTMLDivElement>(null);
+
+  // Copy Approved Users Modal & Format State
+  const [isCopyApprovedModalOpen, setIsCopyApprovedModalOpen] = useState(false);
+  const [copyFormat, setCopyFormat] = useState<'phones_line' | 'phones_comma' | 'phones_e164' | 'full_list' | 'table_tsv'>('phones_line');
+  const [hasCopiedApproved, setHasCopiedApproved] = useState(false);
 
   // SMS target phone selection state
   const [selectedSmsPhone, setSelectedSmsPhone] = useState<string>('');
@@ -154,14 +165,18 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
       if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
         setIsSettingsOpen(false);
       }
+      if (pdfMenuRef.current && !pdfMenuRef.current.contains(event.target as Node)) {
+        setIsPdfMenuOpen(false);
+      }
     };
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsSettingsOpen(false);
+        setIsPdfMenuOpen(false);
       }
     };
 
-    if (isSettingsOpen) {
+    if (isSettingsOpen || isPdfMenuOpen) {
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
@@ -169,7 +184,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isSettingsOpen]);
+  }, [isSettingsOpen, isPdfMenuOpen]);
 
   // SMS Sent History Logs
   const [smsLogs, setSmsLogs] = useState<SmsLogItem[]>(() => {
@@ -532,6 +547,248 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
     }
   };
 
+  // Robust clipboard copy with fallback
+  const copyTextToClipboard = async (text: string): Promise<boolean> => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      console.warn('Navigator clipboard write failed, attempting fallback', e);
+    }
+
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      return successful;
+    } catch (err) {
+      console.error('Fallback clipboard copy failed', err);
+      return false;
+    }
+  };
+
+  // Generate formatted text for approved users
+  const getFormattedApprovedText = (format: string = copyFormat): string => {
+    if (approvedSubmissions.length === 0) return '';
+    switch (format) {
+      case 'phones_line':
+        return approvedSubmissions
+          .map((s) => canonicalPhone(s.userPhone) || s.userPhone)
+          .filter(Boolean)
+          .join('\n');
+      case 'phones_comma':
+        return approvedSubmissions
+          .map((s) => canonicalPhone(s.userPhone) || s.userPhone)
+          .filter(Boolean)
+          .join(', ');
+      case 'phones_e164':
+        return approvedSubmissions
+          .map((s) => {
+            const can = canonicalPhone(s.userPhone);
+            return can.startsWith('0') ? '+251' + can.slice(1) : s.userPhone;
+          })
+          .filter(Boolean)
+          .join(', ');
+      case 'full_list':
+        return approvedSubmissions
+          .map(
+            (s, idx) =>
+              `${idx + 1}. ${s.userName || 'Member'} - ${s.userPhone || 'N/A'} - ${s.planName || 'Plan'} (${Number(s.amount || 0).toLocaleString()} ETB)`
+          )
+          .join('\n');
+      case 'table_tsv': {
+        const header = '#\tMember Name\tPhone Number\tPlan Tier\tAmount (ETB)\tStatus\tRegistration Date';
+        const rows = approvedSubmissions.map((s, idx) => {
+          const dateStr = s.submittedAt ? new Date(s.submittedAt).toLocaleDateString() : 'N/A';
+          return `${idx + 1}\t${s.userName || 'N/A'}\t${s.userPhone || 'N/A'}\t${s.planName || 'N/A'}\t${s.amount || 0}\tAPPROVED\t${dateStr}`;
+        });
+        return [header, ...rows].join('\n');
+      }
+      default:
+        return approvedSubmissions.map((s) => s.userPhone).join('\n');
+    }
+  };
+
+  // Handler to copy approved users to clipboard
+  const handleCopyApprovedUsers = async (formatOverride?: string) => {
+    if (approvedSubmissions.length === 0) {
+      info('No Approved Users', 'There are no approved users to copy.');
+      return;
+    }
+    const textToCopy = getFormattedApprovedText(formatOverride || copyFormat);
+    if (!textToCopy) {
+      info('No Data', 'No approved user details available to copy.');
+      return;
+    }
+
+    const ok = await copyTextToClipboard(textToCopy);
+    if (ok) {
+      setHasCopiedApproved(true);
+      setTimeout(() => setHasCopiedApproved(false), 2500);
+      success(
+        'Copied Approved Users!',
+        `Successfully copied ${approvedSubmissions.length} approved contact(s) to clipboard.`
+      );
+    } else {
+      error('Copy Failed', 'Could not access clipboard. Please copy manually from the preview box.');
+    }
+  };
+
+  // Export only approved phones to PDF
+  const exportApprovedPhonesPDF = async () => {
+    if (approvedSubmissions.length === 0) {
+      info('No Approved Records', 'There are no approved users with phone numbers to export.');
+      return;
+    }
+
+    setIsExportingApprovedPdf(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const { default: autoTable } = await import('jspdf-autotable');
+
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      // Header Banner
+      doc.setFillColor(16, 24, 39); // Deep dark slate / navy
+      doc.rect(0, 0, 210, 25, 'F');
+
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('NAZAZI SPIRITUAL SMS - APPROVED PHONE DIRECTORY', 14, 11);
+
+      doc.setFontSize(8.5);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(209, 213, 219);
+      doc.text('Official Verified Subscriber Phone Numbers & Active Spiritual SMS Access', 14, 18);
+
+      // Meta details block
+      const exportDate = new Date().toLocaleString();
+      const totalAmount = approvedSubmissions.reduce((sum, s) => sum + (s.amount || 0), 0);
+
+      doc.setTextColor(60, 60, 65);
+      doc.setFontSize(8);
+      doc.text(`Generated: ${exportDate}`, 14, 31);
+      doc.text(
+        `Total Verified Contacts: ${approvedSubmissions.length} approved subscriber phone number(s)`,
+        14,
+        35.5
+      );
+      doc.text('Status: 100% VERIFIED & ACTIVE', 14, 40);
+
+      doc.text(`Total Active Value: ${totalAmount.toLocaleString()} ETB`, 122, 31);
+      doc.text('Admin System: Nazazi SMS Gateway', 122, 35.5);
+      doc.text('Confidential - Authorized Staff Only', 122, 40);
+
+      // Subtle Divider
+      doc.setDrawColor(225, 225, 230);
+      doc.line(14, 44, 196, 44);
+
+      const tableData = approvedSubmissions.map((sub, idx) => {
+        const subDate = new Date(sub.reviewedAt || sub.submittedAt);
+        const dateStr = !isNaN(subDate.getTime()) ? subDate.toLocaleDateString() : 'N/A';
+        const formattedPhone = canonicalPhone(sub.userPhone) || sub.userPhone || 'N/A';
+        return [
+          idx + 1,
+          sub.userName || 'N/A',
+          formattedPhone,
+          sub.planName || '1 Month Access',
+          `${Number(sub.amount || 0).toLocaleString()} ETB`,
+          'ACTIVE',
+          dateStr,
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 47,
+        head: [['#', 'Member Name', 'Approved Phone Number', 'Plan Tier', 'Amount', 'Status', 'Date']],
+        body: tableData,
+        theme: 'grid',
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          fontSize: 8,
+          halign: 'left',
+        },
+        styles: {
+          fontSize: 7.5,
+          cellPadding: 2.5,
+          valign: 'middle',
+          overflow: 'linebreak',
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 10 },
+          1: { cellWidth: 42, fontStyle: 'bold' },
+          2: { cellWidth: 36, fontStyle: 'bold', textColor: [15, 23, 42] },
+          3: { cellWidth: 36 },
+          4: { cellWidth: 22, halign: 'right' },
+          5: { cellWidth: 20, halign: 'center', textColor: [16, 149, 106], fontStyle: 'bold' },
+          6: { cellWidth: 20, halign: 'center' },
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        foot: [
+          [
+            '',
+            `Total: ${approvedSubmissions.length} approved phone(s)`,
+            '',
+            '',
+            `${totalAmount.toLocaleString()} ETB`,
+            'ALL ACTIVE',
+            '',
+          ],
+        ],
+        footStyles: {
+          fillColor: [241, 245, 249],
+          textColor: [15, 23, 42],
+          fontStyle: 'bold',
+          fontSize: 8,
+        },
+      });
+
+      // Add footer to each page
+      const totalDocPages = (doc as any).internal.getNumberOfPages();
+      for (let i = 1; i <= totalDocPages; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(140, 140, 145);
+        doc.text(
+          `Nazazi Spiritual Services | Approved Phone Directory | Page ${i} of ${totalDocPages}`,
+          14,
+          290
+        );
+      }
+
+      const dateSlug = new Date().toISOString().split('T')[0];
+      doc.save(`nazazi_approved_phones_${dateSlug}.pdf`);
+      success(
+        'Approved Phones Exported',
+        `Generated PDF directory with ${approvedSubmissions.length} approved phone number(s).`
+      );
+    } catch (err) {
+      console.error('Approved Phones PDF Export Error:', err);
+      error('Export Error', 'Failed to generate approved phones PDF directory.');
+    } finally {
+      setIsExportingApprovedPdf(false);
+      setIsPdfMenuOpen(false);
+    }
+  };
+
   const handleExecuteReset = async () => {
     setIsResetting(true);
     try {
@@ -831,7 +1088,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
           onClick={() => {
             setActiveTab('send_sms');
           }}
-          className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer ${
+          className={`p-3 sm:p-4 rounded-xl sm:rounded-2xl border transition-all cursor-pointer relative group ${
             activeTab === 'send_sms'
               ? 'border-zinc-900 dark:border-zinc-100 bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-950 shadow-md'
               : 'border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 hover:border-zinc-300 dark:hover:border-zinc-700'
@@ -839,10 +1096,23 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider opacity-80">2. Approved</span>
-            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCopyApprovedModalOpen(true);
+                }}
+                title="Copy all approved users"
+                className="p-1 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 transition-colors cursor-pointer"
+              >
+                <Copy className="w-3.5 h-3.5" />
+              </button>
+              <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
+            </div>
           </div>
           <p className="text-xl sm:text-2xl font-extrabold mt-1">{approvedCount}</p>
-          <p className="text-[10px] sm:text-[11px] opacity-70 mt-0.5 truncate">Ready for SMS</p>
+          <p className="text-[10px] sm:text-[11px] opacity-70 mt-0.5 truncate">Ready for SMS • Click to copy</p>
         </div>
 
         <div
@@ -1005,6 +1275,25 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             </div>
 
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap justify-end">
+              {/* Copy Approved Users Button */}
+              <button
+                type="button"
+                onClick={() => setIsCopyApprovedModalOpen(true)}
+                aria-label="Copy Approved Users"
+                title="Copy all approved users & phone numbers to clipboard"
+                className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/70 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all cursor-pointer shadow-2xs"
+              >
+                {hasCopiedApproved ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                )}
+                <span>Copy Approved</span>
+                <span className="px-1.5 py-0.2 rounded-md bg-emerald-200/80 dark:bg-emerald-800/80 text-[10px] font-bold">
+                  {approvedCount}
+                </span>
+              </button>
+
               {/* Export to CSV Button with responsive icon/text */}
               <button
                 type="button"
@@ -1018,17 +1307,94 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
                 <span className="hidden sm:inline">CSV</span>
               </button>
 
-              {/* Export to PDF Button with responsive icon/text */}
+              {/* Export to PDF Menu with Dropdown Options */}
+              <div className="relative" ref={pdfMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsPdfMenuOpen(!isPdfMenuOpen)}
+                  disabled={isExportingPdf || isExportingApprovedPdf}
+                  aria-label="Export to PDF options"
+                  title="Export list or approved phones to PDF"
+                  className="inline-flex items-center justify-center gap-1 px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-all cursor-pointer shadow-2xs"
+                >
+                  <FileText className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
+                  <span className="hidden sm:inline">PDF</span>
+                  <ChevronDown className="w-3 h-3 text-zinc-400" />
+                </button>
+
+                {isPdfMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-64 p-1.5 bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 z-50 animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-2.5 py-1.5 text-[10px] font-bold text-zinc-400 dark:text-zinc-500 uppercase tracking-wider">
+                      PDF Export Options
+                    </div>
+
+                    {/* Option 1: Master Report */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPdfMenuOpen(false);
+                        exportToPDF();
+                      }}
+                      className="w-full p-2 rounded-xl flex items-start gap-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left cursor-pointer group"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <FileText className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200">
+                            Master Report
+                          </span>
+                          <span className="text-[10px] text-zinc-400 font-mono">
+                            {filteredSubmissions.length}
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-zinc-500 leading-tight mt-0.5">
+                          Current filtered list with all columns
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Option 2: Approved Phones Only */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        exportApprovedPhonesPDF();
+                      }}
+                      className="w-full p-2 rounded-xl flex items-start gap-2.5 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors text-left cursor-pointer group"
+                    >
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <Smartphone className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                            Approved Phones Only
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950/80 px-1.5 py-0.2 rounded-md font-mono">
+                            {approvedCount}
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-zinc-500 leading-tight mt-0.5">
+                          Directory of verified subscriber phones
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Direct Quick Button: Approved Phones PDF */}
               <button
                 type="button"
-                onClick={exportToPDF}
-                disabled={isExportingPdf}
-                aria-label="Export to PDF"
-                title="Export list as PDF"
-                className="inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-all cursor-pointer shadow-2xs"
+                onClick={exportApprovedPhonesPDF}
+                disabled={isExportingApprovedPdf}
+                aria-label="Export Approved Phones PDF"
+                title="Export only all approved phone numbers as PDF"
+                className="hidden lg:inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 h-8 rounded-xl text-xs font-semibold border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-50 dark:hover:bg-zinc-700 disabled:opacity-50 transition-all cursor-pointer shadow-2xs"
               >
-                <FileText className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-                <span className="hidden sm:inline">PDF</span>
+                <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span>Approved Phones PDF</span>
               </button>
 
               {/* Toggle Select Mode Button */}
@@ -1972,6 +2338,151 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({ onExitAd
             <Button variant="danger" size="sm" onClick={handleExecuteReset} isLoading={isResetting}>
               Yes, Clear All Data
             </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Copy Approved Users & Phones Modal */}
+      <Modal
+        isOpen={isCopyApprovedModalOpen}
+        onClose={() => setIsCopyApprovedModalOpen(false)}
+        title={`Copy Approved Users (${approvedCount})`}
+        description="Format and copy all verified subscriber phone numbers & member details to your clipboard."
+        maxWidth="lg"
+      >
+        <div className="space-y-4 text-xs">
+          {/* Format selection cards */}
+          <div>
+            <label className="block text-xs font-bold text-zinc-800 dark:text-zinc-200 mb-2">
+              Select Output Format:
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <button
+                type="button"
+                onClick={() => setCopyFormat('phones_line')}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  copyFormat === 'phones_line'
+                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-2xs'
+                    : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate">Phones (Line)</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-1">One number per line</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCopyFormat('phones_comma')}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  copyFormat === 'phones_comma'
+                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-2xs'
+                    : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold">
+                  <Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate">Comma Separated</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-1">For SMS gateways</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCopyFormat('full_list')}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  copyFormat === 'full_list'
+                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-2xs'
+                    : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold">
+                  <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate">Full Details</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-1">Name, Phone & Plan</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCopyFormat('table_tsv')}
+                className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  copyFormat === 'table_tsv'
+                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 shadow-2xs'
+                    : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:border-zinc-300'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <span className="truncate">Excel / Table</span>
+                </div>
+                <p className="text-[10px] text-zinc-500 mt-1">Tab-separated columns</p>
+              </button>
+            </div>
+          </div>
+
+          {/* Preview Box */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-[11px] text-zinc-500 dark:text-zinc-400">
+              <span className="font-medium">Live Output Preview ({approvedCount} approved contacts):</span>
+              <span className="font-mono text-[10px]">
+                {getFormattedApprovedText().length.toLocaleString()} characters
+              </span>
+            </div>
+            <textarea
+              readOnly
+              rows={7}
+              value={getFormattedApprovedText() || 'No approved records available.'}
+              className="w-full p-3 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900/90 font-mono text-[11px] text-zinc-800 dark:text-zinc-200 focus:outline-hidden resize-none selection:bg-emerald-500 selection:text-white"
+            />
+          </div>
+
+          {/* Modal Footer Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsCopyApprovedModalOpen(false);
+                  exportApprovedPhonesPDF();
+                }}
+                disabled={isExportingApprovedPdf}
+                leftIcon={<Smartphone className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />}
+              >
+                Export Approved Phones PDF
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setIsCopyApprovedModalOpen(false)}
+              >
+                Close
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => handleCopyApprovedUsers()}
+                disabled={approvedCount === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                leftIcon={
+                  hasCopiedApproved ? (
+                    <Check className="w-3.5 h-3.5 text-white" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5 text-white" />
+                  )
+                }
+              >
+                {hasCopiedApproved ? 'Copied to Clipboard!' : 'Copy to Clipboard'}
+              </Button>
+            </div>
           </div>
         </div>
       </Modal>
